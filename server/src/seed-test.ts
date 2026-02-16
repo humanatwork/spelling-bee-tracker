@@ -5,12 +5,12 @@
 
 const BASE = 'http://localhost:3141/api';
 
-async function request(path: string, options?: RequestInit) {
+async function request(path: string, options?: RequestInit): Promise<any> {
   const res = await fetch(`${BASE}${path}`, {
     headers: { 'Content-Type': 'application/json' },
     ...options,
   });
-  const data = await res.json();
+  const data: any = await res.json();
   if (!res.ok) throw new Error(`${res.status}: ${data.error}`);
   return data;
 }
