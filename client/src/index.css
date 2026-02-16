@@ -1,0 +1,34 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: #fafafa;
+}
+
+@layer components {
+  .word-accepted {
+    @apply text-green-700 bg-green-50;
+  }
+  .word-rejected {
+    @apply text-red-500 bg-red-50 line-through;
+  }
+  .word-pending {
+    @apply text-gray-700 bg-gray-50;
+  }
+  .word-scratch {
+    @apply text-gray-400 bg-gray-50 italic;
+  }
+  .word-pangram {
+    @apply font-bold text-amber-600;
+  }
+}
+
+@keyframes slide-in {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.animate-slide-in {
+  animation: slide-in 0.2s ease-out;
+}
