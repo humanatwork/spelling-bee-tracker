@@ -1,1 +1,10 @@
 refs/
+node_modules/
+dist/
+data/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+.env
+.DS_Store
