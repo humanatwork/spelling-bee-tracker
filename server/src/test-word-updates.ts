@@ -83,14 +83,18 @@ async function main() {
   });
   counted(updatedNotes.notes === 'updated note', 'Update notes via PATCH');
 
-  // is_pangram toggle
-  const pangram = await request(`/days/2098-01-01/words/${w1.id}`, {
+  // is_pangram toggle (must use a word that contains all 7 letters)
+  const cocktailWord = await request('/days/2098-01-01/words', {
+    method: 'POST',
+    body: JSON.stringify({ word: 'cocktail' }),
+  });
+  const pangram = await request(`/days/2098-01-01/words/${cocktailWord.id}`, {
     method: 'PATCH',
     body: JSON.stringify({ is_pangram: true }),
   });
-  counted(pangram.is_pangram === true, 'Set is_pangram to true');
+  counted(pangram.is_pangram === true, 'Set is_pangram to true on valid pangram');
 
-  const notPangram = await request(`/days/2098-01-01/words/${w1.id}`, {
+  const notPangram = await request(`/days/2098-01-01/words/${cocktailWord.id}`, {
     method: 'PATCH',
     body: JSON.stringify({ is_pangram: false }),
   });
