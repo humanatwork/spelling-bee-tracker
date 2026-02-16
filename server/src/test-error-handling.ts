@@ -210,8 +210,50 @@ async function main() {
   });
   countedAssert(completeFakeDay.status === 404, 'POST complete non-existent day returns 404');
 
+  // ── Pangram validation ──
+  console.log('\n7. Pangram validation...');
+
+  // Create a day for pangram tests
+  await request('/days', {
+    method: 'POST',
+    body: JSON.stringify({ date: '2099-03-01', letters: ['T', 'I', 'A', 'O', 'L', 'K', 'C'] }),
+  });
+
+  // POST: short word marked as pangram should be rejected
+  const shortPangram = await requestRaw('/days/2099-03-01/words', {
+    method: 'POST',
+    body: JSON.stringify({ word: 'tick', is_pangram: true }),
+  });
+  countedAssert(shortPangram.status === 400, 'Short word (4 letters) rejected as pangram on POST');
+  countedAssert(shortPangram.data.error.includes('pangram'), 'Error message mentions pangram');
+
+  // POST: word missing a letter should be rejected as pangram
+  const missingLetter = await requestRaw('/days/2099-03-01/words', {
+    method: 'POST',
+    body: JSON.stringify({ word: 'ticktock', is_pangram: true }),
+  });
+  countedAssert(missingLetter.status === 400, 'Word missing day letters rejected as pangram on POST');
+
+  // POST: valid pangram should be accepted
+  const validPangram = await request('/days/2099-03-01/words', {
+    method: 'POST',
+    body: JSON.stringify({ word: 'cocktail', is_pangram: true }),
+  });
+  countedAssert(validPangram.is_pangram === true, 'Valid pangram accepted on POST');
+
+  // PATCH: marking a short word as pangram should be rejected
+  const shortWord = await request('/days/2099-03-01/words', {
+    method: 'POST',
+    body: JSON.stringify({ word: 'toil' }),
+  });
+  const patchShortPangram = await requestRaw(`/days/2099-03-01/words/${shortWord.id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ is_pangram: true }),
+  });
+  countedAssert(patchShortPangram.status === 400, 'Short word rejected as pangram on PATCH');
+
   // ── Phase 2 stubs (501s) ──
-  console.log('\n7. Phase 2 stub endpoints...');
+  console.log('\n8. Phase 2 stub endpoints...');
 
   const stats501 = await requestRaw('/days/2099-02-01/stats');
   countedAssert(stats501.status === 501, 'Day stats returns 501');

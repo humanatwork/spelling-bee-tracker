@@ -31,6 +31,16 @@ function formatWord(w: any) {
   };
 }
 
+function validatePangram(word: string, day: any): string | null {
+  const letters: string[] = JSON.parse(day.letters);
+  const wordUpper = word.toUpperCase();
+  const missing = letters.filter(l => !wordUpper.includes(l));
+  if (missing.length > 0) {
+    return `A pangram must use all 7 letters (missing: ${missing.join(', ')})`;
+  }
+  return null;
+}
+
 function getNextPosition(dayId: number): number {
   const db = getDb();
   const result = db.prepare('SELECT MAX(position) as max_pos FROM words WHERE day_id = ?').get(dayId) as any;
@@ -82,6 +92,15 @@ router.post('/', (req: Request, res: Response) => {
   const normalizedWord = word.toUpperCase().trim();
   const wordStage = stage || day.current_stage;
   const wordStatus = status || (wordStage === 'pre-pangram' ? 'pending' : 'pending');
+
+  // Validate pangram designation
+  if (is_pangram) {
+    const pangramError = validatePangram(normalizedWord, day);
+    if (pangramError) {
+      res.status(400).json({ error: pangramError });
+      return;
+    }
+  }
 
   // Check for existing word (reattempt/attractor logic)
   const existing = db.prepare('SELECT * FROM words WHERE day_id = ? AND word = ?').get(day.id, normalizedWord) as any;
@@ -163,6 +182,16 @@ router.patch('/:id', (req: Request, res: Response) => {
   if (!existing) {
     res.status(404).json({ error: 'Word not found' });
     return;
+  }
+
+  // Validate pangram designation
+  if (req.body.is_pangram) {
+    const word = (existing as any).word;
+    const pangramError = validatePangram(word, day);
+    if (pangramError) {
+      res.status(400).json({ error: pangramError });
+      return;
+    }
   }
 
   const updates: string[] = [];
