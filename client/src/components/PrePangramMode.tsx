@@ -13,6 +13,7 @@ interface Props {
 
 export function PrePangramMode({ day, words, onWordsChange, onDayChange }: Props) {
   const [pulsingId, setPulsingId] = useState<number | null>(null);
+  const [pangramCandidate, setPangramCandidate] = useState<Word | null>(null);
 
   async function handleAddWord(word: string) {
     try {
@@ -21,6 +22,13 @@ export function PrePangramMode({ day, words, onWordsChange, onDayChange }: Props
         showToast(`${result.word} — already entered (\u00d7${result.attempt_count})`, 'warning');
         setPulsingId(result.id);
         setTimeout(() => setPulsingId(null), 2000);
+        onWordsChange();
+        return;
+      }
+      if (isPangramCandidate(result.word)) {
+        setPangramCandidate(result);
+        onWordsChange();
+        return;
       }
       onWordsChange();
     } catch (e: any) {
@@ -35,8 +43,21 @@ export function PrePangramMode({ day, words, onWordsChange, onDayChange }: Props
       // Transition to backfill
       await api.updateDay(day.date, { current_stage: 'backfill' });
       showToast(`${word.word} marked as pangram! Entering backfill mode.`, 'success');
+      setPangramCandidate(null);
       onWordsChange();
       onDayChange();
+    } catch (e: any) {
+      showToast(e.message, 'warning');
+    }
+  }
+
+  async function handleRejectCandidate() {
+    if (!pangramCandidate) return;
+    try {
+      await api.updateWord(day.date, pangramCandidate.id, { status: 'rejected' });
+      showToast(`${pangramCandidate.word} marked as rejected`, 'info');
+      setPangramCandidate(null);
+      onWordsChange();
     } catch (e: any) {
       showToast(e.message, 'warning');
     }
@@ -64,7 +85,31 @@ export function PrePangramMode({ day, words, onWordsChange, onDayChange }: Props
         letters={day.letters}
         centerLetter={day.center_letter}
         placeholder="Brainstorm words... (Enter to add)"
+        disabled={!!pangramCandidate}
       />
+
+      {pangramCandidate && (
+        <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4 text-center space-y-3">
+          <p className="text-sm text-yellow-800 font-medium">
+            <span className="font-mono text-lg uppercase">{pangramCandidate.word}</span> uses all 7 letters!
+          </p>
+          <p className="text-sm text-yellow-700">Is this the pangram?</p>
+          <div className="flex justify-center gap-3">
+            <button
+              onClick={() => handleMarkPangram(pangramCandidate)}
+              className="px-4 py-2 bg-yellow-400 text-yellow-900 rounded-lg font-medium hover:bg-yellow-500"
+            >
+              Yes, it's the pangram
+            </button>
+            <button
+              onClick={handleRejectCandidate}
+              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300"
+            >
+              No (mark rejected)
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="text-xs text-gray-500">
         Click a word to mark it as pangram, or press <kbd className="px-1 bg-gray-100 border rounded">P</kbd> for the last word
