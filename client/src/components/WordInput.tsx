@@ -21,6 +21,7 @@ export function WordInput({ onSubmit, letters, centerLetter, placeholder = 'Type
   function validate(word: string): string {
     if (!letters || !centerLetter) return '';
     const upper = word.toUpperCase();
+    if (upper.length > 0 && upper.length < 4) return 'Too short (min 4 letters)';
     if (upper.length < 4) return '';
     const letterSet = new Set(letters.map(l => l.toUpperCase()));
 
@@ -46,6 +47,7 @@ export function WordInput({ onSubmit, letters, centerLetter, placeholder = 'Type
     e.preventDefault();
     const trimmed = value.trim();
     if (!trimmed) return;
+    if (trimmed.length < 4) return;
     onSubmit(trimmed);
     setValue('');
     setWarning('');

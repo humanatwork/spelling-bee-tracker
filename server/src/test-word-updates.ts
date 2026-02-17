@@ -189,16 +189,16 @@ async function main() {
   });
   const first = await request('/days/2098-01-02/words', {
     method: 'POST',
-    body: JSON.stringify({ word: 'ace' }),
+    body: JSON.stringify({ word: 'aced' }),
   });
   const third = await request('/days/2098-01-02/words', {
     method: 'POST',
-    body: JSON.stringify({ word: 'bag' }),
+    body: JSON.stringify({ word: 'bage' }),
   });
   // Insert between first and third
   const between = await request('/days/2098-01-02/words', {
     method: 'POST',
-    body: JSON.stringify({ word: 'bad', after_word_id: first.id }),
+    body: JSON.stringify({ word: 'bade', after_word_id: first.id }),
   });
   counted(between.position > first.position, 'Inserted word has position > after_word');
   counted(between.position < third.position, 'Inserted word has position < next word');
@@ -206,7 +206,7 @@ async function main() {
   // Verify final order
   const orderedWords = await request('/days/2098-01-02/words');
   const wordOrder = orderedWords.map((w: any) => w.word);
-  counted(wordOrder[0] === 'ACE' && wordOrder[1] === 'BAD' && wordOrder[2] === 'BAG',
+  counted(wordOrder[0] === 'ACED' && wordOrder[1] === 'BADE' && wordOrder[2] === 'BAGE',
     'Words in correct position order after insert-between');
 
   // ── No-op PATCH ──
