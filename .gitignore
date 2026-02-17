@@ -8,3 +8,4 @@ data/
 *.sqlite
 .env
 .DS_Store
+.claude/
