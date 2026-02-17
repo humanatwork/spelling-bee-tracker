@@ -2,7 +2,10 @@ import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
 
-const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), 'data', 'spelling-bee.db');
+// Resolve relative to project root (two levels up from server/src/), not process.cwd(),
+// so the DB location is the same regardless of how the server is started.
+const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
+const DB_PATH = process.env.DB_PATH || path.join(PROJECT_ROOT, 'data', 'spelling-bee.db');
 
 let db: Database.Database | null = null;
 
