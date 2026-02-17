@@ -15,6 +15,7 @@ export function BackfillMode({ day, words, onWordsChange, onDayChange }: Props) 
   const [backfillState, setBackfillState] = useState<BackfillState | null>(null);
   const [chainStack, setChainStack] = useState<Word[]>([]);
   const [inspireMode, setInspireMode] = useState(false);
+  const [judgedStatus, setJudgedStatus] = useState<'accepted' | 'rejected' | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadBackfill = useCallback(async () => {
@@ -48,14 +49,48 @@ export function BackfillMode({ day, words, onWordsChange, onDayChange }: Props) 
       return;
     }
 
-    // Normal backfill advance
+    if (action === 'skip') {
+      // Skip advances immediately
+      try {
+        const result = await api.advanceBackfill(day.date, 'skip');
+        if (result.is_complete) {
+          showToast('Backfill complete! Transitioning to new discovery mode.', 'success');
+          await api.completeBackfill(day.date);
+          onDayChange();
+        }
+        setInspireMode(false);
+        setJudgedStatus(null);
+        await loadBackfill();
+        onWordsChange();
+      } catch (e: any) {
+        showToast(e.message, 'warning');
+      }
+      return;
+    }
+
+    // Accept or reject: set status but don't advance cursor
+    if (!activeWord) return;
     try {
-      const result = await api.advanceBackfill(day.date, action);
+      const status = action === 'accept' ? 'accepted' : 'rejected';
+      await api.updateWord(day.date, activeWord.id, { status });
+      setJudgedStatus(status);
+      setInspireMode(false);
+      onWordsChange();
+    } catch (e: any) {
+      showToast(e.message, 'warning');
+    }
+  }
+
+  async function handleNext() {
+    if (!judgedStatus) return;
+    try {
+      const result = await api.advanceBackfill(day.date, 'skip');
       if (result.is_complete) {
         showToast('Backfill complete! Transitioning to new discovery mode.', 'success');
         await api.completeBackfill(day.date);
         onDayChange();
       }
+      setJudgedStatus(null);
       setInspireMode(false);
       await loadBackfill();
       onWordsChange();
@@ -111,9 +146,18 @@ export function BackfillMode({ day, words, onWordsChange, onDayChange }: Props) 
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
 
       switch (e.key.toLowerCase()) {
-        case 'a': handleAction('accept'); break;
-        case 'r': handleAction('reject'); break;
-        case 's': handleAction('skip'); break;
+        case 'a':
+          if (!judgedStatus) handleAction('accept');
+          break;
+        case 'r':
+          if (!judgedStatus) handleAction('reject');
+          break;
+        case 's':
+          if (!judgedStatus) handleAction('skip');
+          break;
+        case 'n':
+          if (judgedStatus) handleNext();
+          break;
         case 'i': setInspireMode(true); break;
         case 'escape': handleEscape(); break;
         case 'b': handleBackToList(); break;
@@ -191,8 +235,65 @@ export function BackfillMode({ day, words, onWordsChange, onDayChange }: Props) 
               {activeWord.is_pangram ? 'PANGRAM' : `Word ${backfillState.cursor_index + 1}`}
             </div>
 
-            {/* Action buttons */}
-            {!inspireMode && (
+            {/* Judged state: show status badge + inspire + next */}
+            {judgedStatus && !inspireMode && chainStack.length === 0 && (
+              <div className="space-y-3">
+                <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                  judgedStatus === 'accepted'
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-red-100 text-red-800'
+                }`}>
+                  {judgedStatus === 'accepted' ? 'Accepted' : 'Rejected'}
+                </span>
+                <div className="flex justify-center gap-3">
+                  <button
+                    onClick={() => setInspireMode(true)}
+                    className="px-6 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 font-medium"
+                  >
+                    <kbd className="mr-1 text-purple-200">I</kbd>nspire
+                  </button>
+                  <button
+                    onClick={handleNext}
+                    className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium"
+                  >
+                    <kbd className="mr-1 text-blue-200">N</kbd>ext
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Action buttons (pre-judgment) */}
+            {!judgedStatus && !inspireMode && chainStack.length === 0 && (
+              <div className="flex justify-center gap-3">
+                <button
+                  onClick={() => handleAction('accept')}
+                  className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 font-medium"
+                >
+                  <kbd className="mr-1 text-green-200">A</kbd>ccept
+                </button>
+                <button
+                  onClick={() => handleAction('reject')}
+                  className="px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 font-medium"
+                >
+                  <kbd className="mr-1 text-red-200">R</kbd>eject
+                </button>
+                <button
+                  onClick={() => handleAction('skip')}
+                  className="px-6 py-2 bg-gray-400 text-white rounded-lg hover:bg-gray-500 font-medium"
+                >
+                  <kbd className="mr-1 text-gray-200">S</kbd>kip
+                </button>
+                <button
+                  onClick={() => setInspireMode(true)}
+                  className="px-6 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 font-medium"
+                >
+                  <kbd className="mr-1 text-purple-200">I</kbd>nspire
+                </button>
+              </div>
+            )}
+
+            {/* Chain word buttons (same as before — chain words don't use judged state) */}
+            {!inspireMode && chainStack.length > 0 && (
               <div className="flex justify-center gap-3">
                 <button
                   onClick={() => handleAction('accept')}
