@@ -43,14 +43,21 @@ npx tsc --noEmit -p client/tsconfig.json  # Type-check client
 
 ### Running Tests
 
-The verification suite requires a running server with a fresh database:
+Run all test suites automatically (each gets a fresh database):
+
+```bash
+npm run test:fresh               # Run all test suites
+./scripts/test-fresh.sh server/src/seed-test.ts  # Run a single suite
+```
+
+Or manually with two terminals:
 
 ```bash
 rm -rf data/ && npm run dev    # Terminal 1: clean DB + start servers
 npx tsx server/src/seed-test.ts  # Terminal 2: run test suite
 ```
 
-All 30 assertions must pass before any branch is considered merge-ready.
+All assertions must pass before any branch is considered merge-ready.
 
 ## Git Workflow
 
