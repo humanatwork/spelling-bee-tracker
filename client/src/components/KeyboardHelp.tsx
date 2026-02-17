@@ -15,7 +15,6 @@ export function KeyboardHelp({ stage, onClose }: Props) {
         <div className="space-y-3 text-sm">
           <div className="font-medium text-gray-500 uppercase text-xs">All stages</div>
           <Row k="Enter" desc="Submit word (when input focused)" />
-          <Row k="G" desc="Toggle genius" />
           <Row k="?" desc="Show this help" />
 
           {stage === 'pre-pangram' && (
