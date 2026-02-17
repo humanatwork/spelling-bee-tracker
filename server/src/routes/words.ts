@@ -90,6 +90,12 @@ router.post('/', (req: Request, res: Response) => {
   }
 
   const normalizedWord = word.toUpperCase().trim();
+
+  if (normalizedWord.length < 4) {
+    res.status(400).json({ error: 'Word must be at least 4 letters' });
+    return;
+  }
+
   const wordStage = stage || day.current_stage;
   const wordStatus = status || (wordStage === 'pre-pangram' ? 'pending' : 'pending');
 
@@ -269,6 +275,11 @@ router.post('/:id/inspire', (req: Request, res: Response) => {
   }
 
   const normalizedWord = word.toUpperCase().trim();
+
+  if (normalizedWord.length < 4) {
+    res.status(400).json({ error: 'Word must be at least 4 letters' });
+    return;
+  }
 
   // Check for reattempt
   const existing = db.prepare('SELECT * FROM words WHERE day_id = ? AND word = ?').get(day.id, normalizedWord) as any;
