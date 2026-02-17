@@ -30,8 +30,15 @@ router.post('/', (req: Request, res: Response) => {
     return;
   }
 
-  const center_letter = letters[0].toUpperCase();
   const normalizedLetters = letters.map((l: string) => l.toUpperCase());
+  const center_letter = normalizedLetters[0];
+
+  // Check for duplicate letters
+  const uniqueLetters = new Set(normalizedLetters);
+  if (uniqueLetters.size !== 7) {
+    res.status(400).json({ error: 'All 7 letters must be unique (duplicate letters found)' });
+    return;
+  }
 
   try {
     const result = db.prepare(`
@@ -76,6 +83,26 @@ router.patch('/:date', (req: Request, res: Response) => {
   const values: any[] = [];
 
   if (req.body.current_stage !== undefined) {
+    const stageOrder: Record<string, number> = {
+      'pre-pangram': 0,
+      'backfill': 1,
+      'new-discovery': 2,
+    };
+    const currentOrder = stageOrder[day.current_stage];
+    const newOrder = stageOrder[req.body.current_stage];
+    if (newOrder === undefined) {
+      res.status(400).json({ error: `Invalid stage: ${req.body.current_stage}` });
+      return;
+    }
+    if (newOrder < currentOrder) {
+      res.status(400).json({ error: `Cannot transition backward from ${day.current_stage} to ${req.body.current_stage}` });
+      return;
+    }
+    if (newOrder > currentOrder + 1) {
+      res.status(400).json({ error: `Cannot skip stages: ${day.current_stage} to ${req.body.current_stage}` });
+      return;
+    }
+    // Same stage is a no-op, but we still add the update (harmless)
     updates.push('current_stage = ?');
     values.push(req.body.current_stage);
   }
@@ -134,13 +161,22 @@ router.get('/:date/export', (req: Request, res: Response) => {
     WHERE w.day_id = ? ORDER BY wa.attempted_at
   `).all(day.id);
 
+  const letters: string[] = JSON.parse(day.letters);
+  const centerLetter = day.center_letter;
+
   res.json({
     ...formatDay(day),
-    words: words.map((w: any) => ({
-      ...w,
-      is_pangram: !!w.is_pangram,
-      inspired_by_ids: JSON.parse(w.inspired_by_ids).filter((id: any) => id !== null),
-    })),
+    words: words.map((w: any) => {
+      const wordUpper = (w.word as string).toUpperCase();
+      const hasCenterLetter = wordUpper.includes(centerLetter);
+      const allLettersValid = [...wordUpper].every(ch => letters.includes(ch));
+      return {
+        ...w,
+        is_pangram: !!w.is_pangram,
+        inspired_by_ids: JSON.parse(w.inspired_by_ids).filter((id: any) => id !== null),
+        valid: hasCenterLetter && allLettersValid,
+      };
+    }),
     attempts,
   });
 });

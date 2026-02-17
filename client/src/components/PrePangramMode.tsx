@@ -77,7 +77,7 @@ export function PrePangramMode({ day, words, onWordsChange, onDayChange }: Props
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-gray-700">Pre-Pangram Brainstorming</h2>
-        <span className="text-sm text-gray-500">{words.length} words</span>
+        <span data-testid="word-count" className="text-sm text-gray-500">{words.length} words</span>
       </div>
 
       <WordInput
@@ -89,7 +89,7 @@ export function PrePangramMode({ day, words, onWordsChange, onDayChange }: Props
       />
 
       {pangramCandidate && (
-        <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4 text-center space-y-3">
+        <div data-testid="pangram-dialog" className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4 text-center space-y-3">
           <p className="text-sm text-yellow-800 font-medium">
             <span className="font-mono text-lg uppercase">{pangramCandidate.word}</span> uses all 7 letters!
           </p>

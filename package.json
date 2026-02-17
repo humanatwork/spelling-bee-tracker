@@ -10,9 +10,11 @@
     "dev": "concurrently --kill-others-on-fail -n server,client -c blue,green \"npm run dev -w server\" \"npm run dev -w client\"",
     "build": "npm run build -w client && npm run build -w server",
     "start": "npm run start -w server",
-    "test:fresh": "./scripts/test-fresh.sh"
+    "test:fresh": "./scripts/test-fresh.sh",
+    "test:e2e": "rm -f data/test-e2e.db data/test-e2e.db-wal data/test-e2e.db-shm && npx playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "concurrently": "^9.1.0"
   }
 }

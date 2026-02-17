@@ -18,6 +18,7 @@ export function NewDiscoveryMode({ day, words, onWordsChange }: Props) {
 
   const newDiscoveryWords = words.filter(w => w.stage === 'new-discovery');
   const lastWord = newDiscoveryWords.length > 0 ? newDiscoveryWords[newDiscoveryWords.length - 1] : null;
+  const lastPendingWord = [...newDiscoveryWords].reverse().find(w => w.status === 'pending') || null;
 
   async function handleAddWord(word: string) {
     try {
@@ -73,6 +74,16 @@ export function NewDiscoveryMode({ day, words, onWordsChange }: Props) {
         case 't':
           setScratchMode(prev => !prev);
           break;
+        case 'a':
+          if (lastPendingWord) {
+            handleStatusChange(lastPendingWord, 'accepted');
+          }
+          break;
+        case 'r':
+          if (lastPendingWord) {
+            handleStatusChange(lastPendingWord, 'rejected');
+          }
+          break;
         case 'i':
           if (lastWord) {
             setInspireSource(lastWord);
@@ -96,6 +107,7 @@ export function NewDiscoveryMode({ day, words, onWordsChange }: Props) {
         <div className="flex items-center gap-3">
           <button
             onClick={() => setScratchMode(!scratchMode)}
+            data-testid="scratch-toggle"
             className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
               scratchMode
                 ? 'bg-gray-700 text-white'
@@ -137,7 +149,7 @@ export function NewDiscoveryMode({ day, words, onWordsChange }: Props) {
       )}
 
       {/* New discovery words with inline accept/reject */}
-      <div className="space-y-1">
+      <div data-testid="new-discovery-words" className="space-y-1">
         <h3 className="text-sm font-semibold text-gray-500 uppercase">New Discovery Words</h3>
         {newDiscoveryWords.length === 0 ? (
           <div className="text-gray-400 text-sm italic py-2">Start entering new words</div>
@@ -193,7 +205,7 @@ export function NewDiscoveryMode({ day, words, onWordsChange }: Props) {
       </div>
 
       {/* Full word list */}
-      <details className="mt-4">
+      <details data-testid="full-word-list" className="mt-4">
         <summary className="text-sm text-gray-500 cursor-pointer hover:text-gray-700">
           Full word list ({words.length} words)
         </summary>

@@ -274,8 +274,121 @@ async function main() {
   });
   countedAssert(patchShortPangram.status === 400, 'Short word rejected as pangram on PATCH');
 
+  // ── Duplicate letter validation ──
+  console.log('\n8. Duplicate letter validation...');
+
+  const dupLetters = await requestRaw('/days', {
+    method: 'POST',
+    body: JSON.stringify({ date: '2099-04-01', letters: ['T', 'T', 'A', 'O', 'L', 'K', 'C'] }),
+  });
+  countedAssert(dupLetters.status === 400, 'Duplicate letters in array returns 400');
+  countedAssert(dupLetters.data.error.includes('unique') || dupLetters.data.error.includes('duplicate'),
+    'Error message mentions uniqueness or duplicates');
+
+  // ── Stage transition validation (one-way only) ──
+  console.log('\n9. Stage transition validation...');
+
+  // Create a fresh day for stage tests
+  await request('/days', {
+    method: 'POST',
+    body: JSON.stringify({ date: '2099-05-01', letters: ['T', 'I', 'A', 'O', 'L', 'K', 'C'] }),
+  });
+
+  // pre-pangram → new-discovery should fail (must go through backfill)
+  const skipBackfill = await requestRaw('/days/2099-05-01', {
+    method: 'PATCH',
+    body: JSON.stringify({ current_stage: 'new-discovery' }),
+  });
+  countedAssert(skipBackfill.status === 400, 'pre-pangram → new-discovery returns 400');
+
+  // pre-pangram → backfill should succeed
+  const toBackfill = await requestRaw('/days/2099-05-01', {
+    method: 'PATCH',
+    body: JSON.stringify({ current_stage: 'backfill' }),
+  });
+  countedAssert(toBackfill.status === 200, 'pre-pangram → backfill succeeds');
+
+  // backfill → pre-pangram should fail (backward transition)
+  const backToPre = await requestRaw('/days/2099-05-01', {
+    method: 'PATCH',
+    body: JSON.stringify({ current_stage: 'pre-pangram' }),
+  });
+  countedAssert(backToPre.status === 400, 'backfill → pre-pangram returns 400');
+
+  // backfill → new-discovery should succeed
+  const toDiscovery = await requestRaw('/days/2099-05-01', {
+    method: 'PATCH',
+    body: JSON.stringify({ current_stage: 'new-discovery' }),
+  });
+  countedAssert(toDiscovery.status === 200, 'backfill → new-discovery succeeds');
+
+  // new-discovery → backfill should fail (backward transition)
+  const backToBackfill = await requestRaw('/days/2099-05-01', {
+    method: 'PATCH',
+    body: JSON.stringify({ current_stage: 'backfill' }),
+  });
+  countedAssert(backToBackfill.status === 400, 'new-discovery → backfill returns 400');
+
+  // new-discovery → pre-pangram should fail (backward transition)
+  const backToPre2 = await requestRaw('/days/2099-05-01', {
+    method: 'PATCH',
+    body: JSON.stringify({ current_stage: 'pre-pangram' }),
+  });
+  countedAssert(backToPre2.status === 400, 'new-discovery → pre-pangram returns 400');
+
+  // Same stage transition should be a no-op (not an error)
+  const sameStage = await requestRaw('/days/2099-05-01', {
+    method: 'PATCH',
+    body: JSON.stringify({ current_stage: 'new-discovery' }),
+  });
+  countedAssert(sameStage.status === 200, 'Same stage transition is a no-op (200)');
+
+  // ── Word valid boolean ──
+  console.log('\n10. Word valid boolean...');
+
+  // Create a day with known letters T,I,A,O,L,K,C (center = T)
+  await request('/days', {
+    method: 'POST',
+    body: JSON.stringify({ date: '2099-06-01', letters: ['T', 'I', 'A', 'O', 'L', 'K', 'C'] }),
+  });
+
+  // Valid word: uses center letter (T) and only day letters
+  const validWord = await request('/days/2099-06-01/words', {
+    method: 'POST',
+    body: JSON.stringify({ word: 'TALK' }),
+  });
+  countedAssert(validWord.valid === true, 'TALK is valid (uses center T, only day letters)');
+
+  // Invalid word: missing center letter
+  const noCenterWord = await request('/days/2099-06-01/words', {
+    method: 'POST',
+    body: JSON.stringify({ word: 'COIL' }),
+  });
+  countedAssert(noCenterWord.valid === false, 'COIL is invalid (missing center letter T)');
+
+  // Invalid word: uses letter not in day's set
+  const offLetterWord = await request('/days/2099-06-01/words', {
+    method: 'POST',
+    body: JSON.stringify({ word: 'TEST' }),
+  });
+  countedAssert(offLetterWord.valid === false, 'TEST is invalid (E and S not in day letters)');
+
+  // Valid pangram
+  const validPangramWord = await request('/days/2099-06-01/words', {
+    method: 'POST',
+    body: JSON.stringify({ word: 'COCKTAIL', is_pangram: true }),
+  });
+  countedAssert(validPangramWord.valid === true, 'COCKTAIL is valid (all day letters, includes center)');
+
+  // Valid word in word list
+  const wordList = await request('/days/2099-06-01/words');
+  const talkInList = wordList.find((w: any) => w.word === 'TALK');
+  countedAssert(talkInList.valid === true, 'valid field present in word list (TALK)');
+  const coilInList = wordList.find((w: any) => w.word === 'COIL');
+  countedAssert(coilInList.valid === false, 'valid field present in word list (COIL = false)');
+
   // ── Phase 2 stubs (501s) ──
-  console.log('\n8. Phase 2 stub endpoints...');
+  console.log('\n11. Phase 2 stub endpoints...');
 
   const stats501 = await requestRaw('/days/2099-02-01/stats');
   countedAssert(stats501.status === 501, 'Day stats returns 501');
