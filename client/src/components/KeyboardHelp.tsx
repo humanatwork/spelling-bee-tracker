@@ -15,6 +15,7 @@ export function KeyboardHelp({ stage, onClose }: Props) {
         <div className="space-y-3 text-sm">
           <div className="font-medium text-gray-500 uppercase text-xs">All stages</div>
           <Row k="Enter" desc="Submit word (when input focused)" />
+          <Row k="Escape" desc="Back to day list" />
           <Row k="?" desc="Show this help" />
 
           {stage === 'pre-pangram' && (
@@ -40,6 +41,8 @@ export function KeyboardHelp({ stage, onClose }: Props) {
           {stage === 'new-discovery' && (
             <>
               <div className="font-medium text-gray-500 uppercase text-xs mt-4">New Discovery</div>
+              <Row k="A" desc="Accept last pending word" />
+              <Row k="R" desc="Reject last pending word" />
               <Row k="T" desc="Toggle scratch mode" />
               <Row k="I" desc="Add inspired word (from last word)" />
             </>

@@ -194,13 +194,13 @@ export function BackfillMode({ day, words, onWordsChange, onDayChange }: Props) 
       <div className="flex-[3] space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-700">Backfill Mode</h2>
-          <span className="text-sm text-gray-500">
+          <span data-testid="progress-text" className="text-sm text-gray-500">
             {backfillState.processed_count}/{backfillState.total_pre_pangram} processed
           </span>
         </div>
 
         {/* Progress bar */}
-        <div className="w-full bg-gray-200 rounded-full h-2">
+        <div data-testid="progress-bar" className="w-full bg-gray-200 rounded-full h-2">
           <div
             className="bg-bee-yellow h-2 rounded-full transition-all"
             style={{ width: `${(backfillState.processed_count / backfillState.total_pre_pangram) * 100}%` }}
@@ -212,7 +212,7 @@ export function BackfillMode({ day, words, onWordsChange, onDayChange }: Props) 
           <div className="bg-white border-2 border-blue-300 rounded-xl p-6 text-center space-y-4">
             {/* Chain breadcrumb */}
             {chainStack.length > 0 && (
-              <div className="text-xs text-purple-500 flex items-center justify-center gap-1">
+              <div data-testid="chain-breadcrumb" className="text-xs text-purple-500 flex items-center justify-center gap-1">
                 {backfillState.current_word && (
                   <span className="text-gray-500">{backfillState.current_word.word}</span>
                 )}
@@ -228,7 +228,7 @@ export function BackfillMode({ day, words, onWordsChange, onDayChange }: Props) 
               </div>
             )}
 
-            <div className="text-4xl font-mono font-bold text-gray-800 uppercase tracking-wider">
+            <div data-testid="current-word" className="text-4xl font-mono font-bold text-gray-800 uppercase tracking-wider">
               {activeWord.word}
             </div>
             <div className="text-sm text-gray-500">
@@ -238,7 +238,7 @@ export function BackfillMode({ day, words, onWordsChange, onDayChange }: Props) 
             {/* Judged state: show status badge + inspire + next */}
             {judgedStatus && !inspireMode && chainStack.length === 0 && (
               <div className="space-y-3">
-                <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                <span data-testid="judged-badge" className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
                   judgedStatus === 'accepted'
                     ? 'bg-green-100 text-green-800'
                     : 'bg-red-100 text-red-800'
@@ -371,7 +371,7 @@ export function BackfillMode({ day, words, onWordsChange, onDayChange }: Props) 
       </div>
 
       {/* Right panel: word list */}
-      <div className="flex-[2] border-l pl-4 overflow-y-auto max-h-[70vh]">
+      <div data-testid="backfill-word-list" className="flex-[2] border-l pl-4 overflow-y-auto max-h-[70vh]">
         <h3 className="text-sm font-semibold text-gray-500 mb-2 uppercase">Word List</h3>
         <WordList
           words={words}
