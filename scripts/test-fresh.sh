@@ -7,6 +7,7 @@ set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DB_DIR="$PROJECT_ROOT/data"
+export DB_PATH="$DB_DIR/test-spelling-bee.db"
 PORT=3141
 SERVER_PID=""
 
@@ -15,6 +16,7 @@ cleanup() {
     kill "$SERVER_PID" 2>/dev/null || true
     wait "$SERVER_PID" 2>/dev/null || true
   fi
+  rm -f "$DB_PATH" "$DB_PATH-wal" "$DB_PATH-shm"
 }
 trap cleanup EXIT
 
@@ -28,7 +30,7 @@ kill_port() {
 }
 
 start_server() {
-  rm -rf "$DB_DIR"
+  rm -f "$DB_PATH" "$DB_PATH-wal" "$DB_PATH-shm"
   npx tsx "$PROJECT_ROOT/server/src/index.ts" &
   SERVER_PID=$!
 
@@ -50,6 +52,7 @@ stop_server() {
     wait "$SERVER_PID" 2>/dev/null || true
     SERVER_PID=""
   fi
+  rm -f "$DB_PATH" "$DB_PATH-wal" "$DB_PATH-shm"
 }
 
 # Default test suites in run order
