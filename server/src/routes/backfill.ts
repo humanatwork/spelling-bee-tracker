@@ -160,6 +160,11 @@ router.post('/complete', (req: Request, res: Response) => {
     return;
   }
 
+  if (day.current_stage !== 'backfill') {
+    res.status(400).json({ error: `Day is in ${day.current_stage} stage, not backfill` });
+    return;
+  }
+
   db.prepare(`
     UPDATE days SET current_stage = 'new-discovery', backfill_cursor_word_id = NULL, updated_at = datetime('now')
     WHERE id = ?

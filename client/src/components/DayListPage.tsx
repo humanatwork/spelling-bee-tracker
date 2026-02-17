@@ -71,6 +71,7 @@ export function DayListPage({ onSelectDay }: Props) {
         <h1 className="text-2xl font-bold text-gray-800">Spelling Bee Tracker</h1>
         <button
           onClick={() => setShowCreate(!showCreate)}
+          data-testid="new-day-button"
           className="px-4 py-2 bg-bee-yellow text-bee-dark font-semibold rounded-lg hover:bg-bee-gold transition-colors"
         >
           {showCreate ? 'Cancel' : '+ New Day'}
@@ -78,13 +79,14 @@ export function DayListPage({ onSelectDay }: Props) {
       </div>
 
       {showCreate && (
-        <form onSubmit={handleCreate} className="bg-white rounded-xl shadow-sm border p-4 mb-6 space-y-3">
+        <form onSubmit={handleCreate} data-testid="create-day-form" className="bg-white rounded-xl shadow-sm border p-4 mb-6 space-y-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
             <input
               type="date"
               value={date}
               onChange={e => setDate(e.target.value)}
+              data-testid="date-input"
               className="px-3 py-2 border border-gray-300 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-bee-yellow"
             />
           </div>
@@ -98,6 +100,7 @@ export function DayListPage({ onSelectDay }: Props) {
               onChange={e => setLetterInput(e.target.value.slice(0, 7))}
               placeholder="e.g. TIAOLKC"
               maxLength={7}
+              data-testid="letter-input"
               className="px-3 py-2 border border-gray-300 rounded-lg w-full font-mono uppercase text-lg tracking-widest
                 focus:outline-none focus:ring-2 focus:ring-bee-yellow"
               autoComplete="off"
@@ -130,6 +133,7 @@ export function DayListPage({ onSelectDay }: Props) {
             <button
               key={day.id}
               onClick={() => onSelectDay(day.date)}
+              data-testid="day-card"
               className="w-full bg-white rounded-xl shadow-sm border p-4 hover:border-bee-yellow transition-colors text-left flex items-center gap-4"
             >
               <div className="flex-1">

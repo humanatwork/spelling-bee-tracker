@@ -64,6 +64,7 @@ export function WordInput({ onSubmit, letters, centerLetter, placeholder = 'Type
           onChange={handleChange}
           placeholder={placeholder}
           disabled={disabled}
+          data-testid="word-input"
           className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-lg font-mono uppercase
             focus:outline-none focus:ring-2 focus:ring-bee-yellow focus:border-transparent
             disabled:opacity-50 disabled:bg-gray-100"
@@ -81,7 +82,7 @@ export function WordInput({ onSubmit, letters, centerLetter, placeholder = 'Type
         </button>
       </div>
       {warning && (
-        <span className="text-xs text-amber-600">{warning} (soft warning — submit anyway)</span>
+        <span data-testid="validation-warning" className="text-xs text-amber-600">{warning} (soft warning — submit anyway)</span>
       )}
     </form>
   );

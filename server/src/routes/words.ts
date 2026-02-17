@@ -11,7 +11,7 @@ function getDay(date: string) {
   return getDb().prepare('SELECT * FROM days WHERE date = ?').get(date) as any;
 }
 
-function getWordsForDay(dayId: number) {
+function getWordsForDay(dayId: number, day: any) {
   const db = getDb();
   const words = db.prepare(`
     SELECT w.*,
@@ -20,15 +20,32 @@ function getWordsForDay(dayId: number) {
     FROM words w WHERE w.day_id = ? ORDER BY w.position
   `).all(dayId);
 
-  return words.map(formatWord);
+  return words.map((w: any) => formatWord(w, day));
 }
 
-function formatWord(w: any) {
-  return {
+function computeValid(word: string, day: any): boolean {
+  const letters: string[] = JSON.parse(day.letters);
+  const centerLetter = day.center_letter;
+  const wordUpper = word.toUpperCase();
+  // Must contain center letter
+  if (!wordUpper.includes(centerLetter)) return false;
+  // Every character must be in the day's letter set
+  for (const ch of wordUpper) {
+    if (!letters.includes(ch)) return false;
+  }
+  return true;
+}
+
+function formatWord(w: any, day?: any) {
+  const result: any = {
     ...w,
     is_pangram: !!w.is_pangram,
     inspired_by_ids: JSON.parse(w.inspired_by_ids || '[]').filter((id: any) => id !== null),
   };
+  if (day) {
+    result.valid = computeValid(w.word, day);
+  }
+  return result;
 }
 
 function validatePangram(word: string, day: any): string | null {
@@ -70,7 +87,7 @@ router.get('/', (req: Request, res: Response) => {
     res.status(404).json({ error: 'Day not found' });
     return;
   }
-  res.json(getWordsForDay(day.id));
+  res.json(getWordsForDay(day.id, day));
 });
 
 // POST /api/days/:date/words - add a word
@@ -126,43 +143,50 @@ router.post('/', (req: Request, res: Response) => {
           (SELECT json_group_array(wi.inspired_by_word_id) FROM word_inspirations wi WHERE wi.word_id = w.id) as inspired_by_ids,
           (SELECT COUNT(*) FROM word_attempts wa WHERE wa.word_id = w.id) as attempt_count
         FROM words w WHERE w.id = ?
-      `).get(existing.id)
+      `).get(existing.id),
+      day
     );
 
     res.status(200).json({ ...result, is_reattempt: true, attempt_count: attemptCount });
     return;
   }
 
-  // Calculate position
-  const position = after_word_id ? getPositionAfter(day.id, after_word_id) : getNextPosition(day.id);
+  // Wrap position calculation + insert in a transaction for concurrency safety
+  const insertWord = db.transaction(() => {
+    const position = after_word_id ? getPositionAfter(day.id, after_word_id) : getNextPosition(day.id);
 
-  const result = db.prepare(`
-    INSERT INTO words (day_id, word, position, stage, status, is_pangram, inspiration_confidence, chain_depth, notes)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    day.id, normalizedWord, position, wordStage, wordStatus,
-    is_pangram ? 1 : 0,
-    inspiration_confidence || null,
-    chain_depth || 0,
-    notes || null
-  );
-
-  const wordId = result.lastInsertRowid as number;
-
-  // Log initial attempt
-  db.prepare(
-    'INSERT INTO word_attempts (word_id, stage) VALUES (?, ?)'
-  ).run(wordId, wordStage);
-
-  // Create inspiration links
-  if (inspired_by && Array.isArray(inspired_by)) {
-    const insertLink = db.prepare(
-      'INSERT OR IGNORE INTO word_inspirations (word_id, inspired_by_word_id) VALUES (?, ?)'
+    const result = db.prepare(`
+      INSERT INTO words (day_id, word, position, stage, status, is_pangram, inspiration_confidence, chain_depth, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      day.id, normalizedWord, position, wordStage, wordStatus,
+      is_pangram ? 1 : 0,
+      inspiration_confidence || null,
+      chain_depth || 0,
+      notes || null
     );
-    for (const sourceId of inspired_by) {
-      insertLink.run(wordId, sourceId);
+
+    const wordId = result.lastInsertRowid as number;
+
+    // Log initial attempt
+    db.prepare(
+      'INSERT INTO word_attempts (word_id, stage) VALUES (?, ?)'
+    ).run(wordId, wordStage);
+
+    // Create inspiration links
+    if (inspired_by && Array.isArray(inspired_by)) {
+      const insertLink = db.prepare(
+        'INSERT OR IGNORE INTO word_inspirations (word_id, inspired_by_word_id) VALUES (?, ?)'
+      );
+      for (const sourceId of inspired_by) {
+        insertLink.run(wordId, sourceId);
+      }
     }
-  }
+
+    return wordId;
+  });
+
+  const wordId = insertWord();
 
   const newWord = db.prepare(`
     SELECT w.*,
@@ -171,7 +195,7 @@ router.post('/', (req: Request, res: Response) => {
     FROM words w WHERE w.id = ?
   `).get(wordId);
 
-  res.status(201).json({ ...formatWord(newWord), is_reattempt: false });
+  res.status(201).json({ ...formatWord(newWord, day), is_reattempt: false });
 });
 
 // PATCH /api/days/:date/words/:id - update a word
@@ -249,7 +273,7 @@ router.patch('/:id', (req: Request, res: Response) => {
     FROM words w WHERE w.id = ?
   `).get(wordId);
 
-  res.json(formatWord(updated));
+  res.json(formatWord(updated, day));
 });
 
 // POST /api/days/:date/words/:id/inspire - create an inspired word
@@ -294,37 +318,46 @@ router.post('/:id/inspire', (req: Request, res: Response) => {
           (SELECT json_group_array(wi.inspired_by_word_id) FROM word_inspirations wi WHERE wi.word_id = w.id) as inspired_by_ids,
           (SELECT COUNT(*) FROM word_attempts wa WHERE wa.word_id = w.id) as attempt_count
         FROM words w WHERE w.id = ?
-      `).get(existing.id)
+      `).get(existing.id),
+      day
     );
 
     res.status(200).json({ ...result, is_reattempt: true });
     return;
   }
 
-  const position = getPositionAfter(day.id, sourceWordId);
   const wordStage = day.current_stage;
 
-  const result = db.prepare(`
-    INSERT INTO words (day_id, word, position, stage, status, inspiration_confidence, chain_depth)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    day.id, normalizedWord, position, wordStage,
-    status || 'pending',
-    inspiration_confidence || 'certain',
-    chain_depth || (sourceWord.chain_depth + 1)
-  );
+  // Wrap position calculation + insert in a transaction for concurrency safety
+  const insertInspired = db.transaction(() => {
+    const position = getPositionAfter(day.id, sourceWordId);
 
-  const newWordId = result.lastInsertRowid as number;
+    const result = db.prepare(`
+      INSERT INTO words (day_id, word, position, stage, status, inspiration_confidence, chain_depth)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      day.id, normalizedWord, position, wordStage,
+      status || 'pending',
+      inspiration_confidence || 'certain',
+      chain_depth || (sourceWord.chain_depth + 1)
+    );
 
-  // Create inspiration link
-  db.prepare(
-    'INSERT INTO word_inspirations (word_id, inspired_by_word_id) VALUES (?, ?)'
-  ).run(newWordId, sourceWordId);
+    const newWordId = result.lastInsertRowid as number;
 
-  // Log initial attempt
-  db.prepare(
-    'INSERT INTO word_attempts (word_id, stage, context) VALUES (?, ?, ?)'
-  ).run(newWordId, wordStage, `inspired by ${sourceWord.word}`);
+    // Create inspiration link
+    db.prepare(
+      'INSERT INTO word_inspirations (word_id, inspired_by_word_id) VALUES (?, ?)'
+    ).run(newWordId, sourceWordId);
+
+    // Log initial attempt
+    db.prepare(
+      'INSERT INTO word_attempts (word_id, stage, context) VALUES (?, ?, ?)'
+    ).run(newWordId, wordStage, `inspired by ${sourceWord.word}`);
+
+    return newWordId;
+  });
+
+  const newWordId = insertInspired();
 
   const newWord = db.prepare(`
     SELECT w.*,
@@ -333,7 +366,7 @@ router.post('/:id/inspire', (req: Request, res: Response) => {
     FROM words w WHERE w.id = ?
   `).get(newWordId);
 
-  res.status(201).json({ ...formatWord(newWord), is_reattempt: false });
+  res.status(201).json({ ...formatWord(newWord, day), is_reattempt: false });
 });
 
 // GET /api/days/:date/words/:id/attempts - get attempt history
