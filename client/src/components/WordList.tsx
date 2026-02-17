@@ -15,7 +15,7 @@ export function WordList({ words, highlightId, cursorId, pulsingId, onWordClick,
   }
 
   return (
-    <div className="flex flex-col gap-0.5">
+    <div data-testid="word-list" className="flex flex-col gap-0.5">
       {words.map((word, index) => {
         const isCursor = word.id === cursorId;
         const isPulsing = word.id === pulsingId;
@@ -32,6 +32,7 @@ export function WordList({ words, highlightId, cursorId, pulsingId, onWordClick,
         return (
           <div
             key={word.id}
+            data-testid="word-item"
             onClick={() => onWordClick?.(word)}
             className={`flex items-center gap-2 px-2 py-0.5 rounded text-sm font-mono
               ${statusClass} ${pangramClass}

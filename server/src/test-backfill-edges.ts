@@ -174,6 +174,55 @@ async function main() {
   });
   counted(advanceAfterComplete.status === 400, 'POST advance after complete returns 400');
 
+  // ── Zero pre-pangram words ──
+  console.log('\n6. Zero pre-pangram words backfill...');
+
+  await request('/days', {
+    method: 'POST',
+    body: JSON.stringify({ date: '2096-04-01', letters: ['T', 'I', 'A', 'O', 'L', 'K', 'C'] }),
+  });
+  // Transition directly to backfill with no words added
+  await request('/days/2096-04-01', {
+    method: 'PATCH',
+    body: JSON.stringify({ current_stage: 'backfill' }),
+  });
+
+  const zeroBf = await request('/days/2096-04-01/backfill');
+  counted(zeroBf.is_complete === true, 'Zero words → backfill is_complete = true');
+  counted(zeroBf.current_word === null, 'Zero words → current_word is null');
+  counted(zeroBf.total_pre_pangram === 0, 'Zero words → total_pre_pangram = 0');
+  counted(zeroBf.processed_count === 0, 'Zero words → processed_count = 0');
+
+  // ── Backfill complete requires backfill stage ──
+  console.log('\n7. Backfill complete without backfill stage...');
+
+  // Create a day in pre-pangram stage
+  await request('/days', {
+    method: 'POST',
+    body: JSON.stringify({ date: '2096-05-01', letters: ['T', 'I', 'A', 'O', 'L', 'K', 'C'] }),
+  });
+
+  const completePre = await requestRaw('/days/2096-05-01/backfill/complete', {
+    method: 'POST',
+  });
+  counted(completePre.status === 400, 'POST /backfill/complete on pre-pangram day returns 400');
+
+  // Also test on a day already in new-discovery
+  await request('/days', {
+    method: 'POST',
+    body: JSON.stringify({ date: '2096-06-01', letters: ['T', 'I', 'A', 'O', 'L', 'K', 'C'] }),
+  });
+  await request('/days/2096-06-01', {
+    method: 'PATCH',
+    body: JSON.stringify({ current_stage: 'backfill' }),
+  });
+  await request('/days/2096-06-01/backfill/complete', { method: 'POST' });
+
+  const completeAgain = await requestRaw('/days/2096-06-01/backfill/complete', {
+    method: 'POST',
+  });
+  counted(completeAgain.status === 400, 'POST /backfill/complete on new-discovery day returns 400');
+
   console.log(`\n=== ALL ${assertionCount} BACKFILL EDGE CASE TESTS PASSED ===`);
 }
 
