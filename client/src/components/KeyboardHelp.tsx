@@ -27,9 +27,10 @@ export function KeyboardHelp({ stage, onClose }: Props) {
           {stage === 'backfill' && (
             <>
               <div className="font-medium text-gray-500 uppercase text-xs mt-4">Backfill</div>
-              <Row k="A" desc="Accept current word" />
-              <Row k="R" desc="Reject current word" />
-              <Row k="S" desc="Skip current word" />
+              <Row k="A" desc="Accept current word (stays on word)" />
+              <Row k="R" desc="Reject current word (stays on word)" />
+              <Row k="S" desc="Skip current word (advances immediately)" />
+              <Row k="N" desc="Next word (after accept/reject)" />
               <Row k="I" desc="Add inspired word" />
               <Row k="Escape" desc="Pop up one chain level / cancel input" />
               <Row k="B" desc="Back to sequential list" />
