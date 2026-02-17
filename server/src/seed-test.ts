@@ -193,30 +193,30 @@ async function main() {
   // Add a fresh word to chain from
   const baseWord = await request('/days/2026-02-09/words', {
     method: 'POST',
-    body: JSON.stringify({ word: 'kit', stage: 'new-discovery' }),
+    body: JSON.stringify({ word: 'coil', stage: 'new-discovery' }),
   });
   // depth 1
   const inspired1 = await request(`/days/2026-02-09/words/${baseWord.id}/inspire`, {
     method: 'POST',
-    body: JSON.stringify({ word: 'kite' }),
+    body: JSON.stringify({ word: 'coal' }),
   });
   assert(inspired1.chain_depth === 1, 'First inspiration has chain_depth 1');
-  assert(inspired1.inspired_by_ids.includes(baseWord.id), 'KITE inspired by KIT');
+  assert(inspired1.inspired_by_ids.includes(baseWord.id), 'COAL inspired by COIL');
 
   // depth 2
   const inspired2 = await request(`/days/2026-02-09/words/${inspired1.id}/inspire`, {
     method: 'POST',
-    body: JSON.stringify({ word: 'kiosk' }),
+    body: JSON.stringify({ word: 'cloak' }),
   });
   assert(inspired2.chain_depth === 2, 'Second inspiration has chain_depth 2');
-  assert(inspired2.inspired_by_ids.includes(inspired1.id), 'KIOSK inspired by KITE');
+  assert(inspired2.inspired_by_ids.includes(inspired1.id), 'CLOAK inspired by COAL');
 
-  // Verify position ordering (should be: ...kit, kite, kiosk, ...)
+  // Verify position ordering (should be: ...coil, coal, cloak, ...)
   const finalWords = await request('/days/2026-02-09/words');
-  const kitIdx = finalWords.findIndex((w: any) => w.word === 'KIT');
-  const kiteIdx = finalWords.findIndex((w: any) => w.word === 'KITE');
-  const kioskIdx = finalWords.findIndex((w: any) => w.word === 'KIOSK');
-  assert(kitIdx < kiteIdx && kiteIdx < kioskIdx, 'Chain words in correct position order');
+  const coilIdx = finalWords.findIndex((w: any) => w.word === 'COIL');
+  const coalIdx = finalWords.findIndex((w: any) => w.word === 'COAL');
+  const cloakIdx = finalWords.findIndex((w: any) => w.word === 'CLOAK');
+  assert(coilIdx < coalIdx && coalIdx < cloakIdx, 'Chain words in correct position order');
 
   // 11. Attractor/reattempt test
   console.log('\n11. Testing attractor/reattempt behavior...');

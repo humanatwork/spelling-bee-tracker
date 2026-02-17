@@ -113,6 +113,21 @@ async function main() {
   });
   countedAssert(emptyWord.status === 400, 'Empty word field returns 400');
 
+  // Word too short (under 4 letters)
+  const shortWord3 = await requestRaw('/days/2099-02-01/words', {
+    method: 'POST',
+    body: JSON.stringify({ word: 'cat' }),
+  });
+  countedAssert(shortWord3.status === 400, '3-letter word returns 400');
+  countedAssert(shortWord3.data.error.includes('4 letters'), 'Error message mentions 4 letters');
+
+  // 4-letter word should succeed
+  const fourLetterWord = await request('/days/2099-02-01/words', {
+    method: 'POST',
+    body: JSON.stringify({ word: 'talk' }),
+  });
+  countedAssert(fourLetterWord.word === 'TALK', '4-letter word is accepted');
+
   // Word on non-existent day
   const wordFakeDay = await requestRaw(`/days/${fakeDate}/words`, {
     method: 'POST',
@@ -161,6 +176,13 @@ async function main() {
     body: JSON.stringify({}),
   });
   countedAssert(inspireMissingWord.status === 400, 'Inspire with missing word returns 400');
+
+  // Inspire with too-short word
+  const inspireShort = await requestRaw(`/days/2099-02-01/words/${w.id}/inspire`, {
+    method: 'POST',
+    body: JSON.stringify({ word: 'at' }),
+  });
+  countedAssert(inspireShort.status === 400, 'Inspire with 2-letter word returns 400');
 
   // ── Backfill errors ──
   console.log('\n6. Backfill errors...');
