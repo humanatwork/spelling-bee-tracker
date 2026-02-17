@@ -28,7 +28,7 @@ async function main() {
 
   await request('/days', {
     method: 'POST',
-    body: JSON.stringify({ date: '2097-03-01', letters: ['A', 'B', 'C', 'D', 'E', 'F', 'G'] }),
+    body: JSON.stringify({ date: '2097-03-01', letters: ['T', 'I', 'A', 'O', 'L', 'K', 'C'] }),
   });
   await request('/days', {
     method: 'POST',
@@ -53,11 +53,11 @@ async function main() {
   // Add words to verify counts
   await request('/days/2097-03-01/words', {
     method: 'POST',
-    body: JSON.stringify({ word: 'ace' }),
+    body: JSON.stringify({ word: 'tick' }),
   });
   await request('/days/2097-03-01/words', {
     method: 'POST',
-    body: JSON.stringify({ word: 'badge', is_pangram: true }),
+    body: JSON.stringify({ word: 'cocktail', is_pangram: true }),
   });
 
   const listWithWords = await request('/days');
