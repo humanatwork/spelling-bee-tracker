@@ -16,6 +16,7 @@ export function DayPage({ date, onBack }: Props) {
   const [day, setDay] = useState<Day | null>(null);
   const [words, setWords] = useState<Word[]>([]);
   const [showHelp, setShowHelp] = useState(false);
+  const [confirmGenius, setConfirmGenius] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const loadDay = useCallback(async () => {
@@ -46,14 +47,6 @@ export function DayPage({ date, onBack }: Props) {
       if (e.key === '?') {
         e.preventDefault();
         setShowHelp(prev => !prev);
-        return;
-      }
-
-      if (e.key.toLowerCase() === 'g' && day) {
-        api.updateDay(date, { genius_achieved: !day.genius_achieved }).then(() => {
-          loadDay();
-          showToast(day.genius_achieved ? 'Genius unmarked' : 'Genius achieved!', 'success');
-        });
         return;
       }
 
@@ -115,10 +108,41 @@ export function DayPage({ date, onBack }: Props) {
           }`}>
             {stageLabels[day.current_stage]}
           </span>
-          {day.genius_achieved && (
-            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-200 text-yellow-800">
-              Genius
+          {confirmGenius ? (
+            <span className="flex items-center gap-1 text-xs">
+              <span className="text-gray-600">{day.genius_achieved ? 'Unmark genius?' : 'Mark genius?'}</span>
+              <button
+                onClick={async () => {
+                  await api.updateDay(date, { genius_achieved: !day.genius_achieved });
+                  showToast(day.genius_achieved ? 'Genius unmarked' : 'Genius achieved!', 'success');
+                  setConfirmGenius(false);
+                  loadDay();
+                }}
+                className="px-1.5 py-0.5 bg-yellow-400 text-yellow-900 rounded font-medium hover:bg-yellow-500"
+              >
+                Yes
+              </button>
+              <button
+                onClick={() => setConfirmGenius(false)}
+                className="px-1.5 py-0.5 bg-gray-200 text-gray-600 rounded font-medium hover:bg-gray-300"
+              >
+                No
+              </button>
             </span>
+          ) : day.genius_achieved ? (
+            <button
+              onClick={() => setConfirmGenius(true)}
+              className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-200 text-yellow-800 hover:bg-yellow-300"
+            >
+              Genius
+            </button>
+          ) : (
+            <button
+              onClick={() => setConfirmGenius(true)}
+              className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 hover:bg-gray-200"
+            >
+              Mark Genius
+            </button>
           )}
           <button
             onClick={() => setShowHelp(true)}
