@@ -61,6 +61,17 @@ All assertions must pass before any branch is considered merge-ready.
 
 ## Git Workflow
 
+### Issue Lifecycle
+
+Every code change maps to a GitHub issue. Follow this end-to-end lifecycle:
+
+1. **Self-assign** — `gh issue edit <N> --add-assignee @me` before starting work
+2. **One branch per issue** — branch name mirrors the issue: e.g., `fix/min-word-length-validation` for "Minimum word length violated"
+3. **Implement on branch** — commit, type-check, and verify on the feature branch
+4. **Create a PR** — use `gh pr create` with `Closes #N` in the body so GitHub auto-closes the issue on merge
+5. **Merge via PR** — merge on GitHub (or `git merge --no-ff` locally) so each issue is a distinct merge commit on `main`
+6. **Clean up** — delete the local branch (`git branch -d <branch>`), delete the remote branch (`git push origin --delete <branch>`), and verify the issue shows as closed
+
 ### Branch-Before-Change Rule
 
 **Never commit directly to `main`.** Always:
@@ -83,6 +94,24 @@ Use the format `<category>/<short-description>` with kebab-case:
 | `admin/` | Config, docs, CI, tooling | `admin/claude-md-update` |
 | `phase2/` | Phase 2 scaffold or implementation | `phase2/stats-endpoint` |
 
+### PR Creation
+
+Always create a PR rather than merging locally — PRs provide an audit trail and link to issues.
+
+Use `gh pr create` with a body following this format:
+
+```
+## Summary
+- <1-3 bullet points describing the change>
+
+## Test plan
+- [ ] <verification steps>
+
+Closes #N
+```
+
+Include `Closes #N` (or `Fixes #N`) as the last line of the body so GitHub auto-closes the issue when the PR merges.
+
 ### Commit Messages
 
 - Use imperative mood: "Add scratch mode counter" not "Added" or "Adds"
@@ -96,10 +125,88 @@ Before merging any branch to `main`, confirm all of the following:
 
 1. **TypeScript compiles cleanly** — `npx tsc --noEmit` passes for both server and client with zero errors
 2. **Vite build succeeds** — `npm run build -w client` produces output without errors
-3. **Integration tests pass** — all 30 assertions in `seed-test.ts` pass against a fresh database
+3. **Integration tests pass** — all suites in `npm run test:fresh` pass against a fresh database
 4. **No regressions** — if the change touches API routes, manually verify the affected endpoint returns expected data
 
 Do not merge with known failures. If a test needs to be updated because behavior intentionally changed, update the test *in the same branch* before merging.
+
+### Branch Cleanup
+
+Delete feature branches immediately after merge — the merge commit on `main` is the permanent record.
+
+```bash
+git branch -d <branch>              # Delete merged local branch
+git push origin --delete <branch>   # Delete remote branch
+git fetch --prune                   # Clean stale remote refs
+git branch --merged main            # List branches safe to delete
+```
+
+Never accumulate merged branches. Clean up after every merge.
+
+## Multi-Issue Workflow
+
+When handling multiple GitHub issues in one session, delegate to sub-agents to avoid context window bloat and enable parallel execution.
+
+### When to Delegate
+
+- **1 issue** — implement inline in the main conversation
+- **2+ independent issues** (no shared files) — delegate each to a sub-agent, run in parallel
+- **2+ issues with shared files** — delegate in dependency order: sequential within conflict groups, parallel across groups
+
+Determine independence by mapping each issue to the files it will touch. If two issues modify the same file, they conflict and must be sequenced.
+
+### Orchestration vs. Implementation
+
+The **parent conversation** orchestrates:
+- Analyze issues and map file impacts
+- Detect conflicts between issues
+- Launch sub-agents (parallel when independent)
+- Run `npm run test:fresh` after each sub-agent completes (centralized — only one test server can run at a time on port 3141)
+- Merge branches to `main` via PR
+- Clean up branches and verify issues are closed
+
+**Sub-agents** implement:
+- Read relevant files
+- Make code changes
+- Type-check (`npx tsc --noEmit`)
+- Commit on the feature branch
+
+Sub-agents do **not**: run integration tests, merge to `main`, or modify files outside their assigned scope.
+
+### Sub-Agent Briefing
+
+Sub-agents start with zero context. Every briefing must be self-contained and include:
+
+1. **CLAUDE.md contents** (or the relevant sections) — code conventions, commit message format, Co-Authored-By trailer
+2. **Issue description** — copy the full issue body, not just the title
+3. **Target files** — list the specific files to read and modify
+4. **Branch name** — pre-created by the parent, following the naming convention
+5. **Explicit constraints** — no tests, no merging, no out-of-scope edits
+
+### Execution Pattern
+
+```
+Parent: analyze issues → group by independence
+  │
+  ├─ Independent group A ──→ Sub-agent 1 (branch, implement, commit)
+  ├─ Independent group B ──→ Sub-agent 2 (branch, implement, commit)
+  │
+  ├─ Wait for all sub-agents ─→ For each branch:
+  │     1. Check out branch
+  │     2. npm run test:fresh
+  │     3. Create PR with "Closes #N"
+  │     4. Merge PR
+  │     5. Delete branch (local + remote)
+  │
+  └─ Final integration test on main
+```
+
+### Conflict Resolution
+
+When sub-agent branches conflict at merge time:
+- Resolve in the parent context (which has visibility into both sides)
+- Re-run `npm run test:fresh` after resolution
+- Never force-push or discard changes without understanding the conflict
 
 ## Testing Strategy
 
