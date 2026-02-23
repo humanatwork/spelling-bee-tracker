@@ -14,12 +14,33 @@ interface Props {
 export function PrePangramMode({ day, words, onWordsChange, onDayChange }: Props) {
   const [pulsingId, setPulsingId] = useState<number | null>(null);
   const [pangramCandidate, setPangramCandidate] = useState<Word | null>(null);
+  const [inspireMode, setInspireMode] = useState(false);
+  const [inspireSource, setInspireSource] = useState<Word | null>(null);
 
   async function handleAddWord(word: string) {
     try {
+      if (inspireMode && inspireSource) {
+        const result = await api.inspireWord(day.date, inspireSource.id, {
+          word,
+          status: 'pending',
+          inspiration_confidence: 'certain',
+        });
+        if (result.is_reattempt) {
+          showToast(`${result.word} — already entered (×${result.attempt_count})`, 'warning');
+          setPulsingId(result.id);
+          setTimeout(() => setPulsingId(null), 2000);
+        } else {
+          showToast(`${result.word} (inspired by ${inspireSource.word})`, 'info');
+        }
+        setInspireMode(false);
+        setInspireSource(null);
+        onWordsChange();
+        return;
+      }
+
       const result = await api.addWord(day.date, { word, stage: 'pre-pangram' });
       if (result.is_reattempt) {
-        showToast(`${result.word} — already entered (\u00d7${result.attempt_count})`, 'warning');
+        showToast(`${result.word} — already entered (×${result.attempt_count})`, 'warning');
         setPulsingId(result.id);
         setTimeout(() => setPulsingId(null), 2000);
         onWordsChange();
@@ -80,11 +101,24 @@ export function PrePangramMode({ day, words, onWordsChange, onDayChange }: Props
         <span data-testid="word-count" className="text-sm text-gray-500">{words.length} words</span>
       </div>
 
+      {inspireMode && inspireSource && (
+        <div className="bg-purple-50 border border-purple-200 rounded-lg px-3 py-2 text-sm text-purple-700 flex items-center justify-between">
+          <span>Adding word inspired by <strong>{inspireSource.word}</strong></span>
+          <button onClick={() => { setInspireMode(false); setInspireSource(null); }} className="text-purple-500 hover:text-purple-700">
+            Cancel
+          </button>
+        </div>
+      )}
+
       <WordInput
         onSubmit={handleAddWord}
         letters={day.letters}
         centerLetter={day.center_letter}
-        placeholder="Brainstorm words... (Enter to add)"
+        placeholder={
+          inspireMode && inspireSource
+            ? `Inspired by ${inspireSource.word}...`
+            : 'Brainstorm words... (Enter to add)'
+        }
         disabled={!!pangramCandidate}
       />
 
@@ -112,18 +146,15 @@ export function PrePangramMode({ day, words, onWordsChange, onDayChange }: Props
       )}
 
       <div className="text-xs text-gray-500">
-        Click a word to mark it as pangram, or press <kbd className="px-1 bg-gray-100 border rounded">P</kbd> for the last word
+        Click a word to add an inspired word, or press <kbd className="px-1 bg-gray-100 border rounded">P</kbd> to mark the last word as pangram
       </div>
 
       <WordList
         words={words}
         pulsingId={pulsingId}
         onWordClick={(word) => {
-          if (isPangramCandidate(word.word)) {
-            handleMarkPangram(word);
-          } else {
-            showToast(`${word.word} doesn't use all 7 letters — not a pangram`, 'warning');
-          }
+          setInspireSource(word);
+          setInspireMode(true);
         }}
       />
     </div>
