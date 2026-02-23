@@ -210,7 +210,14 @@ export function NewDiscoveryMode({ day, words, onWordsChange }: Props) {
           Full word list ({words.length} words)
         </summary>
         <div className="mt-2">
-          <WordList words={words} pulsingId={pulsingId} />
+          <WordList
+            words={words}
+            pulsingId={pulsingId}
+            onWordClick={(word) => {
+              setInspireSource(word);
+              setInspireMode(true);
+            }}
+          />
         </div>
       </details>
     </div>
