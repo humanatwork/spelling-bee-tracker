@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { getDb } from '../db';
+import { writeExport } from '../export';
 
 const router = Router({ mergeParams: true });
 
@@ -147,6 +148,7 @@ router.post('/', (req: Request, res: Response) => {
       day
     );
 
+    writeExport(param(req.params.date));
     res.status(200).json({ ...result, is_reattempt: true, attempt_count: attemptCount });
     return;
   }
@@ -195,6 +197,7 @@ router.post('/', (req: Request, res: Response) => {
     FROM words w WHERE w.id = ?
   `).get(wordId);
 
+  writeExport(param(req.params.date));
   res.status(201).json({ ...formatWord(newWord, day), is_reattempt: false });
 });
 
@@ -273,6 +276,7 @@ router.patch('/:id', (req: Request, res: Response) => {
     FROM words w WHERE w.id = ?
   `).get(wordId);
 
+  writeExport(param(req.params.date));
   res.json(formatWord(updated, day));
 });
 
@@ -322,6 +326,7 @@ router.post('/:id/inspire', (req: Request, res: Response) => {
       day
     );
 
+    writeExport(param(req.params.date));
     res.status(200).json({ ...result, is_reattempt: true });
     return;
   }
@@ -366,6 +371,7 @@ router.post('/:id/inspire', (req: Request, res: Response) => {
     FROM words w WHERE w.id = ?
   `).get(newWordId);
 
+  writeExport(param(req.params.date));
   res.status(201).json({ ...formatWord(newWord, day), is_reattempt: false });
 });
 
