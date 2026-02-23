@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { getDb } from '../db';
+import { writeExport } from '../export';
 
 const router = Router({ mergeParams: true });
 
@@ -144,6 +145,8 @@ router.post('/advance', (req: Request, res: Response) => {
   const nextCursorId = nextWord ? nextWord.id : null;
   db.prepare('UPDATE days SET backfill_cursor_word_id = ? WHERE id = ?').run(nextCursorId, day.id);
 
+  writeExport(param(req.params.date));
+
   res.json({
     processed_word: { ...currentWord, status: action === 'skip' ? currentWord.status : (action === 'accept' ? 'accepted' : 'rejected') },
     next_word: nextWord,
@@ -171,6 +174,7 @@ router.post('/complete', (req: Request, res: Response) => {
   `).run(day.id);
 
   const updated = db.prepare('SELECT * FROM days WHERE id = ?').get(day.id) as any;
+  writeExport(param(req.params.date));
   res.json({
     ...updated,
     letters: JSON.parse(updated.letters),

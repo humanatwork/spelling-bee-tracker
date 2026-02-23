@@ -3,7 +3,12 @@
  * Tests: full workflow, recursive chains, inspiration links, reattempts, persistence
  */
 
+import fs from 'fs';
+import path from 'path';
+
 const BASE = 'http://localhost:3141/api';
+const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
+const EXPORTS_DIR = path.join(PROJECT_ROOT, 'data', 'exports');
 
 async function request(path: string, options?: RequestInit): Promise<any> {
   const res = await fetch(`${BASE}${path}`, {
@@ -260,6 +265,89 @@ async function main() {
   });
   const geniusDay = await request('/days/2026-02-09');
   assert(geniusDay.genius_achieved === true, 'Genius achievement persisted');
+
+  // 14. Auto-export file tests
+  console.log('\n14. Testing auto-export files...');
+  const exportPath = path.join(EXPORTS_DIR, '2026-02-09.json');
+  assert(fs.existsSync(exportPath), 'Export file exists at data/exports/2026-02-09.json');
+
+  const exportData = JSON.parse(fs.readFileSync(exportPath, 'utf-8'));
+  assert(exportData.date === '2026-02-09', 'Export file has correct date');
+  assert(Array.isArray(exportData.letters) && exportData.letters.length === 7, 'Export file has letters array');
+  assert(exportData.center_letter === 'T', 'Export file has correct center letter');
+  assert(exportData.genius_achieved === true, 'Export file reflects genius_achieved');
+  assert(Array.isArray(exportData.words), 'Export file has words array');
+  assert(exportData.words.length === reloadedWords.length, `Export file has all ${reloadedWords.length} words`);
+  assert(Array.isArray(exportData.attempts), 'Export file has attempts array');
+
+  // Verify inspiration links use word text, not IDs
+  const exportedCattail = exportData.words.find((w: any) => w.word === 'CATTAIL');
+  assert(exportedCattail !== undefined, 'Export file contains CATTAIL');
+  assert(
+    Array.isArray(exportedCattail.inspired_by) && exportedCattail.inspired_by.includes('COCKTAIL'),
+    'Export file uses word text for inspired_by (CATTAIL inspired by COCKTAIL)'
+  );
+
+  // Verify a word with no inspiration has empty array
+  const exportedTick = exportData.words.find((w: any) => w.word === 'TICK');
+  assert(
+    Array.isArray(exportedTick.inspired_by) && exportedTick.inspired_by.length === 0,
+    'Export file has empty inspired_by for non-inspired word'
+  );
+
+  // 15. Delete day and verify export file removed
+  console.log('\n15. Testing export file removal on day delete...');
+
+  // First create a temporary day to delete
+  await request('/days', {
+    method: 'POST',
+    body: JSON.stringify({ date: '2026-01-01', letters: ['A', 'B', 'C', 'D', 'E', 'F', 'G'] }),
+  });
+  const tempExportPath = path.join(EXPORTS_DIR, '2026-01-01.json');
+  assert(fs.existsSync(tempExportPath), 'Temp day export file created');
+
+  await fetch(`${BASE}/days/2026-01-01`, { method: 'DELETE' });
+  assert(!fs.existsSync(tempExportPath), 'Export file removed after day delete');
+
+  // 16. Import test
+  console.log('\n16. Testing import from export file...');
+
+  // Save current export data for import test
+  const importTestData = JSON.parse(fs.readFileSync(exportPath, 'utf-8'));
+  // Change the date so it doesn't conflict with the existing day
+  importTestData.date = '2026-02-10';
+  const importFilePath = path.join(EXPORTS_DIR, '2026-02-10.json');
+  fs.writeFileSync(importFilePath, JSON.stringify(importTestData, null, 2));
+
+  // Import via the API isn't available — we test the import module directly
+  // by creating the day via API using the same data structure
+  // (The CLI import script uses getDb() directly, which shares the same DB in test)
+  const { execSync } = await import('child_process');
+  const dbPath = process.env.DB_PATH || path.join(PROJECT_ROOT, 'data', 'spelling-bee.db');
+  execSync(`DB_PATH="${dbPath}" npx tsx "${path.join(PROJECT_ROOT, 'server/src/import.ts')}" "${importFilePath}"`, {
+    cwd: PROJECT_ROOT,
+    stdio: 'pipe',
+  });
+
+  // Verify the imported day exists via API
+  const importedDay = await request('/days/2026-02-10');
+  assert(importedDay.date === '2026-02-10', 'Imported day has correct date');
+  assert(importedDay.current_stage === 'new-discovery', 'Imported day has correct stage');
+  assert(importedDay.genius_achieved === true, 'Imported day has genius_achieved');
+
+  const importedWords = await request('/days/2026-02-10/words');
+  assert(importedWords.length === reloadedWords.length, `Imported day has all ${reloadedWords.length} words`);
+
+  // Verify inspiration links survived import
+  const importedCattail = importedWords.find((w: any) => w.word === 'CATTAIL');
+  assert(importedCattail.inspired_by_ids.length > 0, 'Imported CATTAIL has inspiration links');
+
+  // Verify attempts survived import
+  const importedExport = await request('/days/2026-02-10/export');
+  assert(importedExport.attempts.length > 0, 'Imported day has attempts');
+
+  // Clean up import test file
+  fs.unlinkSync(importFilePath);
 
   console.log('\n=== ALL TESTS PASSED ===');
 }

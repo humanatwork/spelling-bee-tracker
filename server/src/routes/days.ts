@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { getDb } from '../db';
+import { writeExport, removeExport } from '../export';
 
 const router = Router();
 
@@ -46,6 +47,7 @@ router.post('/', (req: Request, res: Response) => {
     `).run(date, JSON.stringify(normalizedLetters), center_letter);
 
     const day = db.prepare('SELECT * FROM days WHERE id = ?').get(result.lastInsertRowid);
+    writeExport(date);
     res.status(201).json(formatDay(day));
   } catch (e: any) {
     if (e.message?.includes('UNIQUE constraint')) {
@@ -125,17 +127,20 @@ router.patch('/:date', (req: Request, res: Response) => {
 
   db.prepare(`UPDATE days SET ${updates.join(', ')} WHERE id = ?`).run(...values);
   const updated = db.prepare('SELECT * FROM days WHERE id = ?').get(day.id);
+  writeExport(param(req.params.date));
   res.json(formatDay(updated));
 });
 
 // DELETE /api/days/:date - delete a day
 router.delete('/:date', (req: Request, res: Response) => {
   const db = getDb();
-  const result = db.prepare('DELETE FROM days WHERE date = ?').run(param(req.params.date));
+  const date = param(req.params.date);
+  const result = db.prepare('DELETE FROM days WHERE date = ?').run(date);
   if (result.changes === 0) {
     res.status(404).json({ error: 'Day not found' });
     return;
   }
+  removeExport(date);
   res.status(204).send();
 });
 
