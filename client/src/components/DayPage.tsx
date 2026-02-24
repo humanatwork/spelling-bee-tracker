@@ -30,8 +30,9 @@ export function DayPage({ date, onBack }: Props) {
       ]);
       setDay(dayData);
       setWords(wordsData);
-    } catch (e: any) {
-      showToast(e.message, 'warning');
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Failed to load day';
+      showToast(message, 'warning');
     } finally {
       setLoading(false);
     }
@@ -59,14 +60,32 @@ export function DayPage({ date, onBack }: Props) {
       setWordInput('');
       setInsertAfterWordId(undefined);
       await loadDay();
-    } catch (e: any) {
-      showToast(e.message, 'warning');
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Failed to add word';
+      showToast(message, 'warning');
     }
   }
 
   function handleLetterClick(letter: string) {
     setWordInput(prev => prev + letter);
     focusWordInput();
+  }
+
+  async function handleShuffle() {
+    if (!day) return;
+    const letters = [...day.letters];
+    // Fisher-Yates shuffle on indices 1-6 (keep center letter at index 0)
+    for (let i = letters.length - 1; i > 1; i--) {
+      const j = 1 + Math.floor(Math.random() * i); // random index from 1 to i
+      [letters[i], letters[j]] = [letters[j], letters[i]];
+    }
+    try {
+      const updated = await api.reorderLetters(date, letters);
+      setDay(updated);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Failed to shuffle letters';
+      showToast(message, 'warning');
+    }
   }
 
   function handleInsertClick(afterWordId: number | null) {
@@ -101,8 +120,9 @@ export function DayPage({ date, onBack }: Props) {
       });
       setSelectedWordId(null);
       await loadDay();
-    } catch (e: any) {
-      showToast(e.message, 'warning');
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Failed to accept word';
+      showToast(message, 'warning');
     }
   }
 
@@ -112,8 +132,9 @@ export function DayPage({ date, onBack }: Props) {
       await api.updateWord(date, selectedWordId, { status: 'rejected' });
       setSelectedWordId(null);
       await loadDay();
-    } catch (e: any) {
-      showToast(e.message, 'warning');
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Failed to reject word';
+      showToast(message, 'warning');
     }
   }
 
@@ -124,8 +145,9 @@ export function DayPage({ date, onBack }: Props) {
     try {
       await api.updateWord(date, selectedWordId, { is_pangram: !word.is_pangram });
       await loadDay();
-    } catch (e: any) {
-      showToast(e.message, 'warning');
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Failed to toggle pangram';
+      showToast(message, 'warning');
     }
   }
 
@@ -135,8 +157,9 @@ export function DayPage({ date, onBack }: Props) {
       await api.deleteWord(date, selectedWordId);
       setSelectedWordId(null);
       await loadDay();
-    } catch (e: any) {
-      showToast(e.message, 'warning');
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Failed to delete word';
+      showToast(message, 'warning');
     }
   }
 
@@ -145,8 +168,9 @@ export function DayPage({ date, onBack }: Props) {
       await api.deleteDay(date);
       showToast('Day deleted', 'info');
       onBack();
-    } catch (e: any) {
-      showToast(e.message, 'warning');
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Failed to delete day';
+      showToast(message, 'warning');
     }
   }
 
@@ -242,6 +266,7 @@ export function DayPage({ date, onBack }: Props) {
             letters={day.letters}
             centerLetter={day.center_letter}
             onLetterClick={handleLetterClick}
+            onShuffle={handleShuffle}
             size="lg"
           />
         </div>
