@@ -65,13 +65,15 @@ Base URL: `http://localhost:3141/api`
 | `/days/:date/words` | POST | Add a word (optional `after_word_id` for insert-at-position) |
 | `/days/:date/words/:id` | PATCH | Update status, points, or pangram flag |
 | `/days/:date/words/:id` | DELETE | Delete a word |
+| `/days/:date/reorder` | POST | Reorder a day's letters (persists custom arrangement) |
 
 ## Data Model
 
-Two SQLite tables:
+Three SQLite tables:
 
 - **days** — date (unique), letters (JSON array of 7), center letter
-- **words** — word text, fractional position, pangram flag, status (pending/accepted/rejected), points
+- **words** — word text, fractional position, pangram flag, status (pending/accepted/rejected), points, inserted-after reference
+- **letter_reorders** — day reference, letter order (JSON array of 7), timestamp
 
 Duplicate words are allowed — the same word can appear multiple times in a day's list.
 
@@ -88,6 +90,8 @@ Run a single suite:
 ```bash
 ./scripts/test-fresh.sh server/src/seed-test.ts
 ```
+
+Tests run on port 3142 by default (separate from the dev server on 3141), so you can run tests while the dev server is up.
 
 Test suites cover: day/word CRUD, fractional positioning, pangram validation, accept/reject with points, cascade delete, error handling, and edge cases.
 
