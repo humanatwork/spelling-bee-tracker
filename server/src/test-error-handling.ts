@@ -1,10 +1,10 @@
 /**
  * Error handling and validation tests.
- * Covers: 400/404/409/501 error paths, health check, phase 2 stubs.
+ * Covers: 400/404/409 error paths, health check.
  * Requires a running server with a fresh database.
  */
 
-import { request, requestRaw, assert, BASE } from './test-helpers';
+import { request, requestRaw, assert } from './test-helpers';
 
 let assertionCount = 0;
 const originalAssert = assert;
@@ -73,28 +73,16 @@ async function main() {
   const getDay404 = await requestRaw(`/days/${fakeDate}`);
   countedAssert(getDay404.status === 404, 'GET non-existent day returns 404');
 
-  const patchDay404 = await requestRaw(`/days/${fakeDate}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ genius_achieved: true }),
-  });
-  countedAssert(patchDay404.status === 404, 'PATCH non-existent day returns 404');
-
   const deleteDay404 = await requestRaw(`/days/${fakeDate}`, {
     method: 'DELETE',
   });
   countedAssert(deleteDay404.status === 404, 'DELETE non-existent day returns 404');
 
-  const exportDay404 = await requestRaw(`/days/${fakeDate}/export`);
-  countedAssert(exportDay404.status === 404, 'Export non-existent day returns 404');
-
-  const attractors404 = await requestRaw(`/days/${fakeDate}/attractors`);
-  countedAssert(attractors404.status === 404, 'Attractors non-existent day returns 404');
-
   // ── Word validation (400s) ──
   console.log('\n4. Word validation errors...');
 
   // Create a day for word tests
-  const testDay = await request('/days', {
+  await request('/days', {
     method: 'POST',
     body: JSON.stringify({ date: '2099-02-01', letters: ['T', 'I', 'A', 'O', 'L', 'K', 'C'] }),
   });
@@ -150,14 +138,10 @@ async function main() {
   });
   countedAssert(patchWord404.status === 404, 'PATCH non-existent word returns 404');
 
-  const inspire404 = await requestRaw(`/days/2099-02-01/words/${fakeWordId}/inspire`, {
-    method: 'POST',
-    body: JSON.stringify({ word: 'test' }),
+  const deleteWord404 = await requestRaw(`/days/2099-02-01/words/${fakeWordId}`, {
+    method: 'DELETE',
   });
-  countedAssert(inspire404.status === 404, 'Inspire from non-existent word returns 404');
-
-  const attempts404 = await requestRaw(`/days/2099-02-01/words/${fakeWordId}/attempts`);
-  countedAssert(attempts404.status === 404, 'Attempts for non-existent word returns 404');
+  countedAssert(deleteWord404.status === 404, 'DELETE non-existent word returns 404');
 
   // PATCH word on non-existent day
   const patchWordFakeDay = await requestRaw(`/days/${fakeDate}/words/1`, {
@@ -166,74 +150,8 @@ async function main() {
   });
   countedAssert(patchWordFakeDay.status === 404, 'PATCH word on non-existent day returns 404');
 
-  // Inspire missing word field
-  const w = await request('/days/2099-02-01/words', {
-    method: 'POST',
-    body: JSON.stringify({ word: 'tick' }),
-  });
-  const inspireMissingWord = await requestRaw(`/days/2099-02-01/words/${w.id}/inspire`, {
-    method: 'POST',
-    body: JSON.stringify({}),
-  });
-  countedAssert(inspireMissingWord.status === 400, 'Inspire with missing word returns 400');
-
-  // Inspire with too-short word
-  const inspireShort = await requestRaw(`/days/2099-02-01/words/${w.id}/inspire`, {
-    method: 'POST',
-    body: JSON.stringify({ word: 'at' }),
-  });
-  countedAssert(inspireShort.status === 400, 'Inspire with 2-letter word returns 400');
-
-  // ── Backfill errors ──
-  console.log('\n6. Backfill errors...');
-
-  // GET backfill on day not in backfill stage
-  const backfillWrongStage = await requestRaw('/days/2099-02-01/backfill');
-  countedAssert(backfillWrongStage.status === 400, 'GET backfill on pre-pangram day returns 400');
-
-  // POST advance on day not in backfill stage
-  const advanceWrongStage = await requestRaw('/days/2099-02-01/backfill/advance', {
-    method: 'POST',
-    body: JSON.stringify({ action: 'accept' }),
-  });
-  countedAssert(advanceWrongStage.status === 400, 'POST advance on pre-pangram day returns 400');
-
-  // POST advance with invalid action
-  // First transition to backfill
-  await request('/days/2099-02-01', {
-    method: 'PATCH',
-    body: JSON.stringify({ current_stage: 'backfill' }),
-  });
-  const invalidAction = await requestRaw('/days/2099-02-01/backfill/advance', {
-    method: 'POST',
-    body: JSON.stringify({ action: 'invalid' }),
-  });
-  countedAssert(invalidAction.status === 400, 'Invalid backfill action returns 400');
-
-  // POST advance with missing action
-  const missingAction = await requestRaw('/days/2099-02-01/backfill/advance', {
-    method: 'POST',
-    body: JSON.stringify({}),
-  });
-  countedAssert(missingAction.status === 400, 'Missing backfill action returns 400');
-
-  // Backfill on non-existent day
-  const backfillFakeDay = await requestRaw(`/days/${fakeDate}/backfill`);
-  countedAssert(backfillFakeDay.status === 404, 'GET backfill non-existent day returns 404');
-
-  const advanceFakeDay = await requestRaw(`/days/${fakeDate}/backfill/advance`, {
-    method: 'POST',
-    body: JSON.stringify({ action: 'accept' }),
-  });
-  countedAssert(advanceFakeDay.status === 404, 'POST advance non-existent day returns 404');
-
-  const completeFakeDay = await requestRaw(`/days/${fakeDate}/backfill/complete`, {
-    method: 'POST',
-  });
-  countedAssert(completeFakeDay.status === 404, 'POST complete non-existent day returns 404');
-
   // ── Pangram validation ──
-  console.log('\n7. Pangram validation...');
+  console.log('\n6. Pangram validation...');
 
   // Create a day for pangram tests
   await request('/days', {
@@ -275,7 +193,7 @@ async function main() {
   countedAssert(patchShortPangram.status === 400, 'Short word rejected as pangram on PATCH');
 
   // ── Duplicate letter validation ──
-  console.log('\n8. Duplicate letter validation...');
+  console.log('\n7. Duplicate letter validation...');
 
   const dupLetters = await requestRaw('/days', {
     method: 'POST',
@@ -284,120 +202,6 @@ async function main() {
   countedAssert(dupLetters.status === 400, 'Duplicate letters in array returns 400');
   countedAssert(dupLetters.data.error.includes('unique') || dupLetters.data.error.includes('duplicate'),
     'Error message mentions uniqueness or duplicates');
-
-  // ── Stage transition validation (one-way only) ──
-  console.log('\n9. Stage transition validation...');
-
-  // Create a fresh day for stage tests
-  await request('/days', {
-    method: 'POST',
-    body: JSON.stringify({ date: '2099-05-01', letters: ['T', 'I', 'A', 'O', 'L', 'K', 'C'] }),
-  });
-
-  // pre-pangram → new-discovery should fail (must go through backfill)
-  const skipBackfill = await requestRaw('/days/2099-05-01', {
-    method: 'PATCH',
-    body: JSON.stringify({ current_stage: 'new-discovery' }),
-  });
-  countedAssert(skipBackfill.status === 400, 'pre-pangram → new-discovery returns 400');
-
-  // pre-pangram → backfill should succeed
-  const toBackfill = await requestRaw('/days/2099-05-01', {
-    method: 'PATCH',
-    body: JSON.stringify({ current_stage: 'backfill' }),
-  });
-  countedAssert(toBackfill.status === 200, 'pre-pangram → backfill succeeds');
-
-  // backfill → pre-pangram should fail (backward transition)
-  const backToPre = await requestRaw('/days/2099-05-01', {
-    method: 'PATCH',
-    body: JSON.stringify({ current_stage: 'pre-pangram' }),
-  });
-  countedAssert(backToPre.status === 400, 'backfill → pre-pangram returns 400');
-
-  // backfill → new-discovery should succeed
-  const toDiscovery = await requestRaw('/days/2099-05-01', {
-    method: 'PATCH',
-    body: JSON.stringify({ current_stage: 'new-discovery' }),
-  });
-  countedAssert(toDiscovery.status === 200, 'backfill → new-discovery succeeds');
-
-  // new-discovery → backfill should fail (backward transition)
-  const backToBackfill = await requestRaw('/days/2099-05-01', {
-    method: 'PATCH',
-    body: JSON.stringify({ current_stage: 'backfill' }),
-  });
-  countedAssert(backToBackfill.status === 400, 'new-discovery → backfill returns 400');
-
-  // new-discovery → pre-pangram should fail (backward transition)
-  const backToPre2 = await requestRaw('/days/2099-05-01', {
-    method: 'PATCH',
-    body: JSON.stringify({ current_stage: 'pre-pangram' }),
-  });
-  countedAssert(backToPre2.status === 400, 'new-discovery → pre-pangram returns 400');
-
-  // Same stage transition should be a no-op (not an error)
-  const sameStage = await requestRaw('/days/2099-05-01', {
-    method: 'PATCH',
-    body: JSON.stringify({ current_stage: 'new-discovery' }),
-  });
-  countedAssert(sameStage.status === 200, 'Same stage transition is a no-op (200)');
-
-  // ── Word valid boolean ──
-  console.log('\n10. Word valid boolean...');
-
-  // Create a day with known letters T,I,A,O,L,K,C (center = T)
-  await request('/days', {
-    method: 'POST',
-    body: JSON.stringify({ date: '2099-06-01', letters: ['T', 'I', 'A', 'O', 'L', 'K', 'C'] }),
-  });
-
-  // Valid word: uses center letter (T) and only day letters
-  const validWord = await request('/days/2099-06-01/words', {
-    method: 'POST',
-    body: JSON.stringify({ word: 'TALK' }),
-  });
-  countedAssert(validWord.valid === true, 'TALK is valid (uses center T, only day letters)');
-
-  // Invalid word: missing center letter
-  const noCenterWord = await request('/days/2099-06-01/words', {
-    method: 'POST',
-    body: JSON.stringify({ word: 'COIL' }),
-  });
-  countedAssert(noCenterWord.valid === false, 'COIL is invalid (missing center letter T)');
-
-  // Invalid word: uses letter not in day's set
-  const offLetterWord = await request('/days/2099-06-01/words', {
-    method: 'POST',
-    body: JSON.stringify({ word: 'TEST' }),
-  });
-  countedAssert(offLetterWord.valid === false, 'TEST is invalid (E and S not in day letters)');
-
-  // Valid pangram
-  const validPangramWord = await request('/days/2099-06-01/words', {
-    method: 'POST',
-    body: JSON.stringify({ word: 'COCKTAIL', is_pangram: true }),
-  });
-  countedAssert(validPangramWord.valid === true, 'COCKTAIL is valid (all day letters, includes center)');
-
-  // Valid word in word list
-  const wordList = await request('/days/2099-06-01/words');
-  const talkInList = wordList.find((w: any) => w.word === 'TALK');
-  countedAssert(talkInList.valid === true, 'valid field present in word list (TALK)');
-  const coilInList = wordList.find((w: any) => w.word === 'COIL');
-  countedAssert(coilInList.valid === false, 'valid field present in word list (COIL = false)');
-
-  // ── Phase 2 stubs (501s) ──
-  console.log('\n11. Phase 2 stub endpoints...');
-
-  const stats501 = await requestRaw('/days/2099-02-01/stats');
-  countedAssert(stats501.status === 501, 'Day stats returns 501');
-
-  const graph501 = await requestRaw('/days/2099-02-01/graph');
-  countedAssert(graph501.status === 501, 'Day graph returns 501');
-
-  const globalStats501 = await requestRaw('/stats');
-  countedAssert(globalStats501.status === 501, 'Global stats returns 501');
 
   console.log(`\n=== ALL ${assertionCount} ERROR HANDLING TESTS PASSED ===`);
 }

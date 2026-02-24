@@ -1,8 +1,8 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
 import daysRouter from './routes/days';
 import wordsRouter from './routes/words';
-import backfillRouter from './routes/backfill';
 import { getDb, closeDb } from './db';
 
 const app = express();
@@ -14,19 +14,23 @@ app.use(express.json());
 // Initialize DB on startup
 getDb();
 
-// Routes
+// API routes
 app.use('/api/days', daysRouter);
 app.use('/api/days/:date/words', wordsRouter);
-app.use('/api/days/:date/backfill', backfillRouter);
-
-// Global stats (phase 2)
-app.get('/api/stats', (_req, res) => {
-  res.status(501).json({ error: 'Global stats not implemented yet (phase 2)' });
-});
 
 // Health check
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Serve client build in production
+const clientDist = path.resolve(__dirname, '../../client/dist');
+app.use(express.static(clientDist));
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api')) return next();
+  res.sendFile(path.join(clientDist, 'index.html'), (err) => {
+    if (err) next();
+  });
 });
 
 app.listen(PORT, () => {
