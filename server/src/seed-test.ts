@@ -1,7 +1,7 @@
 /**
  * Verification script for simplified Spelling Bee Tracker.
  * Tests: day CRUD, word CRUD, positioning, pangram, accept/reject with points,
- * delete word, cascade delete, total points in list.
+ * delete word, cascade delete, total points in list, letter reorder.
  */
 
 const BASE = 'http://localhost:3141/api';
@@ -171,6 +171,51 @@ async function main() {
   assert(mainDay.total_points === 18, `Total points is 18 (4 + 14) (got ${mainDay.total_points})`);
   assert(mainDay.word_count > 0, 'Word count present in list');
   assert(mainDay.pangram_count === 1, 'Pangram count is 1');
+
+  // 11. Letter reorder
+  console.log('\n11. Letter reorder...');
+
+  // 11a. Successful reorder — shuffle non-center letters
+  const reordered = await request('/days/2026-02-09/reorder', {
+    method: 'POST',
+    body: JSON.stringify({ letters: ['T', 'C', 'K', 'L', 'O', 'A', 'I'] }),
+  });
+  assert(Array.isArray(reordered.letters), 'Reordered response has letters array');
+  assert(reordered.letters[0] === 'T', 'Center letter still at index 0 after reorder');
+  assert(reordered.letters.length === 7, 'Still 7 letters after reorder');
+  assert(reordered.letters[1] === 'C', 'Second letter is C after reorder');
+  assert(reordered.letters[5] === 'A', 'Sixth letter is A after reorder');
+
+  // Verify GET returns the new order
+  const dayAfterReorder = await request('/days/2026-02-09');
+  assert(
+    JSON.stringify(dayAfterReorder.letters) === JSON.stringify(['T', 'C', 'K', 'L', 'O', 'A', 'I']),
+    'GET returns new letter order after reorder'
+  );
+
+  // 11b. Reorder with wrong center letter — should fail with 400
+  const badCenterRes = await fetch(`${BASE}/days/2026-02-09/reorder`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ letters: ['I', 'T', 'A', 'O', 'L', 'K', 'C'] }),
+  });
+  assert(badCenterRes.status === 400, 'Reorder with wrong center letter returns 400');
+
+  // 11c. Reorder with different letters — should fail with 400
+  const badLettersRes = await fetch(`${BASE}/days/2026-02-09/reorder`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ letters: ['T', 'X', 'A', 'O', 'L', 'K', 'C'] }),
+  });
+  assert(badLettersRes.status === 400, 'Reorder with different letters returns 400');
+
+  // 11d. Reorder with wrong number of letters — should fail with 400
+  const badCountRes = await fetch(`${BASE}/days/2026-02-09/reorder`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ letters: ['T', 'I', 'A'] }),
+  });
+  assert(badCountRes.status === 400, 'Reorder with wrong letter count returns 400');
 
   console.log('\n=== ALL TESTS PASSED ===');
 }

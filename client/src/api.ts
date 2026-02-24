@@ -41,6 +41,8 @@ export const api = {
     request<Day>('/days', { method: 'POST', body: JSON.stringify({ date, letters }) }),
   getDay: (date: string) => request<Day>(`/days/${date}`),
   deleteDay: (date: string) => request<void>(`/days/${date}`, { method: 'DELETE' }),
+  reorderLetters: (date: string, letters: string[]) =>
+    request<Day>(`/days/${date}/reorder`, { method: 'POST', body: JSON.stringify({ letters }) }),
 
   // Words
   listWords: (date: string) => request<Word[]>(`/days/${date}/words`),

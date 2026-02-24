@@ -71,6 +71,54 @@ router.get('/:date', (req: Request, res: Response) => {
   res.json(formatDay(day));
 });
 
+// POST /api/days/:date/reorder - reorder letters and track the change
+router.post('/:date/reorder', (req: Request, res: Response) => {
+  const db = getDb();
+  const date = param(req.params.date);
+  const { letters } = req.body;
+
+  // Validate letters is an array of 7 strings
+  if (!letters || !Array.isArray(letters) || letters.length !== 7 ||
+      !letters.every((l: unknown) => typeof l === 'string')) {
+    res.status(400).json({ error: 'letters must be an array of 7 strings' });
+    return;
+  }
+
+  const day = db.prepare('SELECT * FROM days WHERE date = ?').get(date) as Record<string, unknown> | undefined;
+  if (!day) {
+    res.status(404).json({ error: 'Day not found' });
+    return;
+  }
+
+  const normalizedNew = (letters as string[]).map((l: string) => l.toUpperCase().trim());
+  const dayLetters = JSON.parse(day.letters as string) as string[];
+
+  // Center letter must remain at index 0
+  if (normalizedNew[0] !== day.center_letter) {
+    res.status(400).json({ error: 'Center letter must remain at index 0' });
+    return;
+  }
+
+  // Must be the same set of letters
+  const sortedExisting = [...dayLetters].sort().join(',');
+  const sortedNew = [...normalizedNew].sort().join(',');
+  if (sortedExisting !== sortedNew) {
+    res.status(400).json({ error: 'Reordered letters must be the same set as the original' });
+    return;
+  }
+
+  // Update the day's letters column
+  db.prepare('UPDATE days SET letters = ? WHERE id = ?')
+    .run(JSON.stringify(normalizedNew), day.id as number);
+
+  // Record the reorder in history
+  db.prepare('INSERT INTO letter_reorders (day_id, letter_order) VALUES (?, ?)')
+    .run(day.id as number, JSON.stringify(normalizedNew));
+
+  const updated = db.prepare('SELECT * FROM days WHERE id = ?').get(day.id as number);
+  res.json(formatDay(updated));
+});
+
 // DELETE /api/days/:date - delete a day
 router.delete('/:date', (req: Request, res: Response) => {
   const db = getDb();
