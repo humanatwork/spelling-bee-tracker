@@ -59,13 +59,12 @@ async function main() {
   });
 
   // Insert 50 words, each time inserting after the most recently inserted word
-  // This creates a chain of midpoint divisions
   let lastInsertedId = anchor1.id;
   const midpointWords: any[] = [];
   for (let i = 0; i < 50; i++) {
-    const word = await request(`/days/2097-02-01/words/${lastInsertedId}/inspire`, {
+    const word = await request('/days/2097-02-01/words', {
       method: 'POST',
-      body: JSON.stringify({ word: `TAIL${String(i).padStart(3, '0')}` }),
+      body: JSON.stringify({ word: `TAIL${String(i).padStart(3, '0')}`, after_word_id: lastInsertedId }),
     });
     midpointWords.push(word);
     lastInsertedId = word.id;
@@ -103,46 +102,6 @@ async function main() {
   }
   counted(minGap > 0, `Minimum position gap (${minGap}) is positive after 50 midpoints`);
   counted(minGap > Number.EPSILON, `Minimum position gap (${minGap}) exceeds floating-point epsilon`);
-
-  // ── 5. Inspire chain positions stay ordered ──
-  console.log('\n5. Inspiration chain positions stay ordered...');
-
-  await request('/days', {
-    method: 'POST',
-    body: JSON.stringify({ date: '2097-03-01', letters: ['T', 'I', 'A', 'O', 'L', 'K', 'C'] }),
-  });
-  const base = await request('/days/2097-03-01/words', {
-    method: 'POST',
-    body: JSON.stringify({ word: 'TICK' }),
-  });
-  const after = await request('/days/2097-03-01/words', {
-    method: 'POST',
-    body: JSON.stringify({ word: 'TOCK' }),
-  });
-
-  // Build a 10-level chain from base
-  let chainParent = base;
-  const chainWords: any[] = [];
-  for (let i = 0; i < 10; i++) {
-    const cw = await request(`/days/2097-03-01/words/${chainParent.id}/inspire`, {
-      method: 'POST',
-      body: JSON.stringify({ word: `COIL${String(i).padStart(2, '0')}` }),
-    });
-    chainWords.push(cw);
-    chainParent = cw;
-  }
-
-  // All chain words should have positions between base and after
-  for (const cw of chainWords) {
-    counted(cw.position > base.position && cw.position < after.position,
-      `Chain word ${cw.word} (pos ${cw.position}) between base (${base.position}) and after (${after.position})`);
-  }
-
-  // Chain depths should be incrementing
-  for (let i = 0; i < chainWords.length; i++) {
-    counted(chainWords[i].chain_depth === i + 1,
-      `Chain word ${i} has depth ${chainWords[i].chain_depth} (expected ${i + 1})`);
-  }
 
   console.log(`\n=== ALL ${assertionCount} POSITION INTEGRITY TESTS PASSED ===`);
 }
