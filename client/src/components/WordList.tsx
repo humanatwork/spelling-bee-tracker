@@ -18,12 +18,15 @@ export function WordList({ words, selectedWordId, insertAfterWordId, onWordClick
       {words.map((word, index) => {
         const isSelected = word.id === selectedWordId;
         const isInsertTarget = insertAfterWordId === word.id;
+        const isInserted = word.inserted_after_word_id != null;
 
         return (
           <div
             key={word.id}
             data-testid="word-item"
-            className="group flex items-center gap-2 px-3 py-1.5 rounded text-sm font-mono"
+            className={`group flex items-center gap-2 px-3 py-1.5 rounded text-sm font-mono
+              ${isInserted ? 'ml-4' : ''}
+            `}
           >
             <div
               onClick={() => onWordClick?.(word)}
@@ -36,8 +39,13 @@ export function WordList({ words, selectedWordId, insertAfterWordId, onWordClick
                 ${onWordClick ? 'cursor-pointer' : ''}
               `}
             >
-              <span className="text-gray-400 text-xs w-6 text-right shrink-0">{index + 1}.</span>
-              <span className="flex-1 truncate">{word.word}</span>
+              {isInserted && (
+                <span className="text-gray-300 text-xs shrink-0">&#8627;</span>
+              )}
+              <span className={`text-xs w-6 text-right shrink-0 ${isInserted ? 'text-gray-300' : 'text-gray-400'}`}>
+                {index + 1}.
+              </span>
+              <span className={`flex-1 truncate ${isInserted ? 'opacity-85' : ''}`}>{word.word}</span>
               {word.is_pangram && <span className="text-xs text-amber-500 shrink-0" title="Pangram">&#9733;</span>}
               {word.status === 'accepted' && word.points != null && (
                 <span className="text-xs text-green-600 font-medium shrink-0">{word.points} pts</span>
