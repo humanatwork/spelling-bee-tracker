@@ -1,8 +1,18 @@
 # Spelling Bee Tracker
 
-An interactive tool for tracking NYT Spelling Bee word discovery, capturing the full ideation chain across three gameplay stages: pre-pangram brainstorming, post-pangram backfill, and new discovery.
+A desktop app for tracking NYT Spelling Bee word discovery. Captures words as you play — date, letters, pangram marking, and accept/reject with points. Built as an Electron app wrapping Express + React.
 
 ## Quick Start
+
+### Desktop App (Electron)
+
+```bash
+npm install
+npm run build
+npm run electron:start
+```
+
+### Development
 
 ```bash
 npm install
@@ -12,46 +22,34 @@ npm run dev
 
 This starts both the Vite dev server (port 5173) and the Express API (port 3141). Vite proxies `/api` requests to Express automatically.
 
+To run the Electron shell in dev mode (hot-reloading from Vite):
+
+```bash
+npm run dev                # Start Vite + Express
+npm run electron:dev       # In another terminal — opens the Electron window
+```
+
 ## How It Works
 
-The tracker models three stages per puzzle day:
-
-### Stage 1: Pre-Pangram
-Brainstorm words without entering them into the game. Type and hit Enter to build a running list. When you find the pangram, click it (or press `P` on the last word) to transition.
-
-### Stage 2: Backfill
-Walk through your pre-pangram list one word at a time, marking each as accepted or rejected by the game. During backfill, entering a word can inspire a new word, which can inspire another — the tracker supports N-depth recursive chains. Rejected words stay in the record with their inspiration links intact.
-
-### Stage 3: New Discovery
-Continue finding new words with accept/reject tracking. Toggle scratch mode (`T`) for rapid-fire low-confidence entries.
+1. **Create a day** — enter the date, all 7 letters, and the center letter
+2. **Add words** — type words into the input field or click the hexagonal beehive to build them letter by letter
+3. **Mark results** — click a word to accept (with points), reject, toggle pangram, or delete
+4. **Insert anywhere** — hover between words to reveal `[+]` buttons for inserting at a specific position
 
 ## Keyboard Shortcuts
 
-| Key | Context | Action |
-|-----|---------|--------|
-| Enter | Any (input focused) | Submit word |
-| A / R / S | Backfill | Accept / Reject / Skip |
-| I | Backfill / New Discovery | Add inspired word |
-| Escape | Backfill chain | Pop up one chain level |
-| B | Backfill chain | Back to sequential list |
-| P | Pre-Pangram | Mark last word as pangram |
-| G | Any | Toggle genius |
-| T | New Discovery | Toggle scratch mode |
-| ? | Any | Show shortcut help |
-
-## Key Features
-
-- **Recursive inspiration chains** — words can inspire other words N levels deep, with full link tracking
-- **Attractor detection** — entering a word that already exists logs a reattempt instead of creating a duplicate; words with multiple attempts are flagged as "attractors"
-- **Fractional positioning** — inserting between existing words uses fractional positions to avoid renumbering
-- **Soft letter validation** — warns about invalid letters but doesn't block submission
-- **Session resume** — pick up a partially-completed day where you left off
+| Key | Action |
+|-----|--------|
+| Enter | Submit word |
+| Escape | Back to day list / cancel action |
+| ? | Toggle shortcut help |
 
 ## Tech Stack
 
-- **Frontend:** React + TypeScript + Vite + Tailwind CSS
+- **Desktop:** Electron (macOS, wraps Express + serves client build)
+- **Frontend:** React 18 + TypeScript + Vite + Tailwind CSS
 - **Backend:** Express + better-sqlite3
-- **Database:** SQLite (stored in `data/spelling-bee.db`, auto-created on first run)
+- **Database:** SQLite (stored in `data/spelling-bee.db` in dev, `~/Library/Application Support/Spelling Bee Tracker/` in production)
 
 ## API
 
@@ -59,44 +57,43 @@ Base URL: `http://localhost:3141/api`
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/days` | GET | List all days |
+| `/days` | GET | List all days (with word count, pangram count, total points) |
 | `/days` | POST | Create a new day |
-| `/days/:date` | GET | Get a day |
-| `/days/:date` | PATCH | Update stage, genius, cursor |
-| `/days/:date/words` | GET | List words for a day |
-| `/days/:date/words` | POST | Add a word (handles reattempts) |
-| `/days/:date/words/:id` | PATCH | Update word status/notes/links |
-| `/days/:date/words/:id/inspire` | POST | Create inspired word + link |
-| `/days/:date/backfill` | GET | Current backfill state |
-| `/days/:date/backfill/advance` | POST | Accept/reject/skip current word |
-| `/days/:date/backfill/complete` | POST | Transition to new-discovery |
-| `/days/:date/attractors` | GET | Words with multiple attempts |
-| `/days/:date/export` | GET | Full day data as JSON |
+| `/days/:date` | GET | Get a day by date |
+| `/days/:date` | DELETE | Delete a day (cascades to words) |
+| `/days/:date/words` | GET | List words for a day (ordered by position) |
+| `/days/:date/words` | POST | Add a word (optional `after_word_id` for insert-at-position) |
+| `/days/:date/words/:id` | PATCH | Update status, points, or pangram flag |
+| `/days/:date/words/:id` | DELETE | Delete a word |
 
 ## Data Model
 
-Four SQLite tables:
+Two SQLite tables:
 
-- **days** — date, letters, center letter, current stage, genius flag
-- **words** — word text, position (fractional), stage, status, pangram flag, chain depth
-- **word_inspirations** — many-to-many links between words (supports multiple/uncertain sources)
-- **word_attempts** — every encounter with a word, including reattempts across stages
+- **days** — date (unique), letters (JSON array of 7), center letter
+- **words** — word text, fractional position, pangram flag, status (pending/accepted/rejected), points
 
-## Verification
+Duplicate words are allowed — the same word can appear multiple times in a day's list.
 
-Run the test script against the 2/9/26 puzzle data (T, I, A, O, L, K, C):
+## Testing
+
+Run all integration test suites (each gets a fresh database):
 
 ```bash
-npm run dev  # in one terminal
-npx tsx server/src/seed-test.ts  # in another
+npm run test:fresh
 ```
 
-This validates: word ordering, recursive chains (tick → tock → ticktock), rejected word persistence, pangram-as-inspiration-source, attractor/reattempt behavior, and stage transitions.
+Run a single suite:
 
-## Phase 2 (Not Yet Implemented)
+```bash
+./scripts/test-fresh.sh server/src/seed-test.ts
+```
 
-The following endpoints return 501 and are scaffolded for future work:
+Test suites cover: day/word CRUD, fractional positioning, pangram validation, accept/reject with points, cascade delete, error handling, and edge cases.
 
-- **Stats:** words-before-pangram, rejection rates, chain depth, cross-day comparison
-- **Inspiration graph:** directed graph visualization of word relationships
-- **Attractor analysis:** attempt frequency, heat maps, letter pattern clustering
+## Building
+
+```bash
+npm run build              # Build client + server for production
+npm run electron:build     # Full build + package as macOS DMG
+```
