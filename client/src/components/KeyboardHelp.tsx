@@ -1,9 +1,8 @@
 interface Props {
-  stage: string;
   onClose: () => void;
 }
 
-export function KeyboardHelp({ stage, onClose }: Props) {
+export function KeyboardHelp({ onClose }: Props) {
   return (
     <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
@@ -13,40 +12,9 @@ export function KeyboardHelp({ stage, onClose }: Props) {
         </div>
 
         <div className="space-y-3 text-sm">
-          <div className="font-medium text-gray-500 uppercase text-xs">All stages</div>
           <Row k="Enter" desc="Submit word (when input focused)" />
-          <Row k="Escape" desc="Back to day list" />
+          <Row k="Escape" desc="Back to day list / cancel action" />
           <Row k="?" desc="Show this help" />
-
-          {stage === 'pre-pangram' && (
-            <>
-              <div className="font-medium text-gray-500 uppercase text-xs mt-4">Pre-Pangram</div>
-              <Row k="P" desc="Mark last word as pangram (transitions to backfill)" />
-            </>
-          )}
-
-          {stage === 'backfill' && (
-            <>
-              <div className="font-medium text-gray-500 uppercase text-xs mt-4">Backfill</div>
-              <Row k="A" desc="Accept current word (stays on word)" />
-              <Row k="R" desc="Reject current word (stays on word)" />
-              <Row k="S" desc="Skip current word (advances immediately)" />
-              <Row k="N" desc="Next word (after accept/reject)" />
-              <Row k="I" desc="Add inspired word" />
-              <Row k="Escape" desc="Pop up one chain level / cancel input" />
-              <Row k="B" desc="Back to sequential list" />
-            </>
-          )}
-
-          {stage === 'new-discovery' && (
-            <>
-              <div className="font-medium text-gray-500 uppercase text-xs mt-4">New Discovery</div>
-              <Row k="A" desc="Accept last pending word" />
-              <Row k="R" desc="Reject last pending word" />
-              <Row k="T" desc="Toggle scratch mode" />
-              <Row k="I" desc="Add inspired word (from last word)" />
-            </>
-          )}
         </div>
       </div>
     </div>

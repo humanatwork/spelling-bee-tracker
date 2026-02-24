@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api, Day, Word } from '../api';
 import { LetterHexagons } from './LetterHexagons';
-import { PrePangramMode } from './PrePangramMode';
-import { BackfillMode } from './BackfillMode';
-import { NewDiscoveryMode } from './NewDiscoveryMode';
+import { WordInput, focusWordInput } from './WordInput';
+import { WordList } from './WordList';
 import { KeyboardHelp } from './KeyboardHelp';
 import { showToast } from './Toast';
 
@@ -15,9 +14,12 @@ interface Props {
 export function DayPage({ date, onBack }: Props) {
   const [day, setDay] = useState<Day | null>(null);
   const [words, setWords] = useState<Word[]>([]);
+  const [wordInput, setWordInput] = useState('');
+  const [insertAfterWordId, setInsertAfterWordId] = useState<number | undefined>(undefined);
+  const [selectedWordId, setSelectedWordId] = useState<number | null>(null);
   const [showHelp, setShowHelp] = useState(false);
-  const [confirmGenius, setConfirmGenius] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [pointsInput, setPointsInput] = useState('');
   const [loading, setLoading] = useState(true);
 
   const loadDay = useCallback(async () => {
@@ -39,23 +41,106 @@ export function DayPage({ date, onBack }: Props) {
     loadDay();
   }, [loadDay]);
 
-  async function handleExport() {
+  async function handleSubmitWord(word: string) {
     try {
-      const data = await api.exportDay(date);
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `spelling-bee-${date}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-      showToast('Export downloaded', 'success');
+      const data: { word: string; is_pangram?: boolean; after_word_id?: number } = { word };
+      if (insertAfterWordId !== undefined) {
+        if (insertAfterWordId === null) {
+          // Insert at top: use after_word_id of 0 won't work, so we handle differently
+          // Actually, after_word_id=null means "append". For insert-at-top, we'd need position logic.
+          // The server's getPositionAfter with a non-existent ID falls back to getNextPosition.
+          // For simplicity, just don't pass after_word_id (appends) — the insert buttons
+          // set insertAfterWordId to a real word id, not null for "top".
+        } else {
+          data.after_word_id = insertAfterWordId;
+        }
+      }
+      await api.addWord(date, data);
+      setWordInput('');
+      setInsertAfterWordId(undefined);
+      await loadDay();
     } catch (e: any) {
       showToast(e.message, 'warning');
     }
   }
 
-  async function handleDelete() {
+  function handleLetterClick(letter: string) {
+    setWordInput(prev => prev + letter);
+    focusWordInput();
+  }
+
+  function handleInsertClick(afterWordId: number | null) {
+    if (afterWordId === null) {
+      // Clicking the top insert button — just append (no after_word_id)
+      setInsertAfterWordId(undefined);
+    } else if (insertAfterWordId === afterWordId) {
+      // Toggle off
+      setInsertAfterWordId(undefined);
+    } else {
+      setInsertAfterWordId(afterWordId);
+      const word = words.find(w => w.id === afterWordId);
+      if (word) {
+        showToast(`Inserting after ${word.word}`, 'info');
+      }
+    }
+    focusWordInput();
+  }
+
+  function handleWordClick(word: Word) {
+    setSelectedWordId(selectedWordId === word.id ? null : word.id);
+    setPointsInput(word.points != null ? String(word.points) : '');
+  }
+
+  async function handleAccept() {
+    if (!selectedWordId) return;
+    const pts = pointsInput ? parseInt(pointsInput) : undefined;
+    try {
+      await api.updateWord(date, selectedWordId, {
+        status: 'accepted',
+        ...(pts !== undefined ? { points: pts } : {}),
+      });
+      setSelectedWordId(null);
+      await loadDay();
+    } catch (e: any) {
+      showToast(e.message, 'warning');
+    }
+  }
+
+  async function handleReject() {
+    if (!selectedWordId) return;
+    try {
+      await api.updateWord(date, selectedWordId, { status: 'rejected' });
+      setSelectedWordId(null);
+      await loadDay();
+    } catch (e: any) {
+      showToast(e.message, 'warning');
+    }
+  }
+
+  async function handleTogglePangram() {
+    if (!selectedWordId) return;
+    const word = words.find(w => w.id === selectedWordId);
+    if (!word) return;
+    try {
+      await api.updateWord(date, selectedWordId, { is_pangram: !word.is_pangram });
+      await loadDay();
+    } catch (e: any) {
+      showToast(e.message, 'warning');
+    }
+  }
+
+  async function handleDeleteWord() {
+    if (!selectedWordId) return;
+    try {
+      await api.deleteWord(date, selectedWordId);
+      setSelectedWordId(null);
+      await loadDay();
+    } catch (e: any) {
+      showToast(e.message, 'warning');
+    }
+  }
+
+  async function handleDeleteDay() {
     try {
       await api.deleteDay(date);
       showToast('Day deleted', 'info');
@@ -65,7 +150,7 @@ export function DayPage({ date, onBack }: Props) {
     }
   }
 
-  // Global keyboard shortcuts
+  // Keyboard shortcuts
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       const target = e.target as HTMLElement;
@@ -77,31 +162,11 @@ export function DayPage({ date, onBack }: Props) {
         return;
       }
 
-      // Escape: back to day list (only when not in a modal)
-      if (e.key === 'Escape' && !showHelp && !confirmGenius && !confirmDelete) {
+      if (e.key === 'Escape') {
+        if (showHelp) { setShowHelp(false); return; }
+        if (selectedWordId) { setSelectedWordId(null); return; }
+        if (confirmDelete) { setConfirmDelete(false); return; }
         onBack();
-        return;
-      }
-
-      // P key in pre-pangram mode: mark last word as pangram
-      if (e.key.toLowerCase() === 'p' && day?.current_stage === 'pre-pangram' && words.length > 0) {
-        const lastWord = words[words.length - 1];
-        const letterSet = new Set(day.letters.map(l => l.toUpperCase()));
-        const wordLetters = new Set(lastWord.word.toUpperCase().split(''));
-        let isPangram = true;
-        for (const l of letterSet) {
-          if (!wordLetters.has(l)) { isPangram = false; break; }
-        }
-        if (isPangram) {
-          api.updateWord(date, lastWord.id, { is_pangram: true }).then(() =>
-            api.updateDay(date, { current_stage: 'backfill' }).then(() => {
-              showToast(`${lastWord.word} marked as pangram! Entering backfill mode.`, 'success');
-              loadDay();
-            })
-          );
-        } else {
-          showToast(`${lastWord.word} doesn't use all 7 letters`, 'warning');
-        }
         return;
       }
     }
@@ -113,89 +178,32 @@ export function DayPage({ date, onBack }: Props) {
     return <div className="text-gray-500 text-center py-8">Loading...</div>;
   }
 
-  const stageLabels: Record<string, string> = {
-    'pre-pangram': 'Pre-Pangram',
-    'backfill': 'Backfill',
-    'new-discovery': 'New Discovery',
-  };
+  const selectedWord = words.find(w => w.id === selectedWordId);
+  const totalPoints = words
+    .filter(w => w.status === 'accepted' && w.points != null)
+    .reduce((sum, w) => sum + (w.points || 0), 0);
+  const wordCount = words.length;
+  const pangramCount = words.filter(w => w.is_pangram).length;
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-2xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={onBack}
-            data-testid="back-button"
-            className="text-gray-500 hover:text-gray-700 text-sm"
-          >
-            &larr; Days
-          </button>
-          <h1 className="text-xl font-bold text-gray-800" data-testid="day-date">{day.date}</h1>
-          <LetterHexagons letters={day.letters} centerLetter={day.center_letter} />
-        </div>
-        <div className="flex items-center gap-3">
-          <span data-testid="stage-badge" className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-            day.current_stage === 'pre-pangram' ? 'bg-amber-100 text-amber-800' :
-            day.current_stage === 'backfill' ? 'bg-blue-100 text-blue-800' :
-            'bg-green-100 text-green-800'
-          }`}>
-            {stageLabels[day.current_stage]}
-          </span>
-          {confirmGenius ? (
-            <span className="flex items-center gap-1 text-xs">
-              <span className="text-gray-600">{day.genius_achieved ? 'Unmark genius?' : 'Mark genius?'}</span>
-              <button
-                data-testid="genius-confirm-yes"
-                onClick={async () => {
-                  await api.updateDay(date, { genius_achieved: !day.genius_achieved });
-                  showToast(day.genius_achieved ? 'Genius unmarked' : 'Genius achieved!', 'success');
-                  setConfirmGenius(false);
-                  loadDay();
-                }}
-                className="px-1.5 py-0.5 bg-yellow-400 text-yellow-900 rounded font-medium hover:bg-yellow-500"
-              >
-                Yes
-              </button>
-              <button
-                data-testid="genius-confirm-no"
-                onClick={() => setConfirmGenius(false)}
-                className="px-1.5 py-0.5 bg-gray-200 text-gray-600 rounded font-medium hover:bg-gray-300"
-              >
-                No
-              </button>
-            </span>
-          ) : day.genius_achieved ? (
-            <button
-              onClick={() => setConfirmGenius(true)}
-              data-testid="genius-button"
-              className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-200 text-yellow-800 hover:bg-yellow-300"
-            >
-              Genius
-            </button>
-          ) : (
-            <button
-              onClick={() => setConfirmGenius(true)}
-              data-testid="genius-button"
-              className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 hover:bg-gray-200"
-            >
-              Mark Genius
-            </button>
-          )}
-          <button
-            onClick={handleExport}
-            data-testid="export-button"
-            className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200"
-            title="Export day data as JSON"
-          >
-            Export
-          </button>
+      <div className="flex items-center justify-between mb-6">
+        <button
+          onClick={onBack}
+          data-testid="back-button"
+          className="text-gray-500 hover:text-gray-700 text-sm"
+        >
+          &larr; Days
+        </button>
+        <h1 className="text-xl font-bold text-gray-800" data-testid="day-date">{day.date}</h1>
+        <div className="flex items-center gap-2">
           {confirmDelete ? (
             <span className="flex items-center gap-1 text-xs">
               <span className="text-gray-600">Delete day?</span>
               <button
                 data-testid="delete-confirm-yes"
-                onClick={handleDelete}
+                onClick={handleDeleteDay}
                 className="px-1.5 py-0.5 bg-red-500 text-white rounded font-medium hover:bg-red-600"
               >
                 Yes
@@ -213,7 +221,6 @@ export function DayPage({ date, onBack }: Props) {
               onClick={() => setConfirmDelete(true)}
               data-testid="delete-day-button"
               className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 hover:bg-red-200"
-              title="Delete this day"
             >
               Delete
             </button>
@@ -228,38 +235,105 @@ export function DayPage({ date, onBack }: Props) {
         </div>
       </div>
 
-      {/* Stage-specific content */}
       <div className="bg-white rounded-xl shadow-sm border p-6">
-        {day.current_stage === 'pre-pangram' && (
-          <PrePangramMode
-            day={day}
-            words={words}
-            onWordsChange={loadDay}
-            onDayChange={loadDay}
+        {/* Beehive display */}
+        <div className="flex justify-center mb-6">
+          <LetterHexagons
+            letters={day.letters}
+            centerLetter={day.center_letter}
+            onLetterClick={handleLetterClick}
+            size="lg"
           />
-        )}
-        {day.current_stage === 'backfill' && (
-          <BackfillMode
-            day={day}
-            words={words}
-            onWordsChange={loadDay}
-            onDayChange={loadDay}
+        </div>
+
+        {/* Word input */}
+        <div className="mb-4">
+          <WordInput
+            value={wordInput}
+            onChange={setWordInput}
+            onSubmit={handleSubmitWord}
+            letters={day.letters}
+            centerLetter={day.center_letter}
+            placeholder={insertAfterWordId !== undefined ? 'Inserting word...' : 'Type a word...'}
           />
+          {insertAfterWordId !== undefined && (
+            <div className="mt-1 flex items-center gap-2 text-xs text-amber-600">
+              <span>Inserting after {words.find(w => w.id === insertAfterWordId)?.word || 'start'}</span>
+              <button
+                onClick={() => setInsertAfterWordId(undefined)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                (cancel)
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Summary bar */}
+        <div className="flex items-center gap-4 text-sm text-gray-600 mb-4 pb-4 border-b">
+          <span className="font-medium">{totalPoints} pts</span>
+          <span>{wordCount} words</span>
+          {pangramCount > 0 && <span>{pangramCount} pangram{pangramCount > 1 ? 's' : ''}</span>}
+        </div>
+
+        {/* Selected word actions */}
+        {selectedWord && (
+          <div className="mb-4 p-3 bg-gray-50 rounded-lg border flex items-center gap-2 flex-wrap">
+            <span className="font-mono font-bold text-sm">{selectedWord.word}</span>
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                value={pointsInput}
+                onChange={e => setPointsInput(e.target.value)}
+                placeholder="pts"
+                className="w-16 px-2 py-1 text-xs border rounded"
+              />
+              <button
+                onClick={handleAccept}
+                className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 font-medium"
+              >
+                Accept
+              </button>
+            </div>
+            <button
+              onClick={handleReject}
+              className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 font-medium"
+            >
+              Reject
+            </button>
+            <button
+              onClick={handleTogglePangram}
+              className="px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded hover:bg-amber-200 font-medium"
+            >
+              {selectedWord.is_pangram ? 'Unmark Pangram' : 'Mark Pangram'}
+            </button>
+            <button
+              onClick={handleDeleteWord}
+              className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded hover:bg-gray-200 font-medium"
+            >
+              Delete
+            </button>
+            <button
+              onClick={() => setSelectedWordId(null)}
+              className="px-2 py-1 text-xs text-gray-400 hover:text-gray-600"
+            >
+              Cancel
+            </button>
+          </div>
         )}
-        {day.current_stage === 'new-discovery' && (
-          <NewDiscoveryMode
-            day={day}
-            words={words}
-            onWordsChange={loadDay}
-          />
-        )}
+
+        {/* Word list */}
+        <WordList
+          words={words}
+          selectedWordId={selectedWordId}
+          insertAfterWordId={insertAfterWordId}
+          onWordClick={handleWordClick}
+          onInsertClick={handleInsertClick}
+        />
       </div>
 
       {showHelp && (
-        <KeyboardHelp
-          stage={day.current_stage}
-          onClose={() => setShowHelp(false)}
-        />
+        <KeyboardHelp onClose={() => setShowHelp(false)} />
       )}
     </div>
   );
