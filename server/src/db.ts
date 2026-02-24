@@ -47,6 +47,7 @@ function initSchema(db: Database.Database): void {
       status TEXT NOT NULL DEFAULT 'pending'
         CHECK(status IN ('pending', 'accepted', 'rejected')),
       points INTEGER,
+      inserted_after_word_id INTEGER REFERENCES words(id) ON DELETE SET NULL,
       created_at TEXT DEFAULT (datetime('now'))
     );
 
