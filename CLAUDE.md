@@ -69,6 +69,8 @@ npm run test:fresh               # Run all test suites
 ./scripts/test-fresh.sh server/src/seed-test.ts  # Run a single suite
 ```
 
+Tests run on port 3142 by default (configurable via `TEST_PORT` env var), so they won't interfere with a dev server running on 3141. The server reads `PORT` from the environment, and `test-fresh.sh` exports `PORT=3142` for both the test server and test files.
+
 Or manually with two terminals:
 
 ```bash
@@ -191,7 +193,7 @@ The **parent conversation** orchestrates:
 - Analyze issues and map file impacts
 - Detect conflicts between issues
 - Launch sub-agents (parallel when independent)
-- Run `npm run test:fresh` after each sub-agent completes (centralized — only one test server can run at a time on port 3141)
+- Run `npm run test:fresh` after each sub-agent completes (centralized — tests use port 3142, separate from the dev server on 3141)
 - Merge branches to `main` via PR
 - Clean up branches and verify issues are closed
 
