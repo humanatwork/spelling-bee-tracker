@@ -8,7 +8,8 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DB_DIR="$PROJECT_ROOT/data"
 export DB_PATH="$DB_DIR/test-spelling-bee.db"
-PORT=3141
+PORT=${TEST_PORT:-3142}
+export PORT
 SERVER_PID=""
 
 cleanup() {
