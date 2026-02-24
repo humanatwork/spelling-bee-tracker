@@ -113,6 +113,11 @@ async function main() {
   assert(insertedIdx === tickIdx + 1, 'Inserted word is right after TICK');
   assert(insertedIdx < tockIdx, 'Inserted word is before TOCK');
 
+  // Verify inserted_after_word_id tracking
+  assert(inserted.inserted_after_word_id === wordIds['TICK'], 'Inserted word tracks after_word_id');
+  const tickWord = wordsAfterInsert.find((w: any) => w.id === wordIds['TICK']);
+  assert(tickWord.inserted_after_word_id === null, 'Appended word has null inserted_after_word_id');
+
   // 8. Delete word — DELETE, verify gone
   console.log('\n8. Delete word...');
   const wordsBefore = await request('/days/2026-02-09/words');
@@ -121,6 +126,27 @@ async function main() {
   const wordsAfterDelete = await request('/days/2026-02-09/words');
   assert(wordsAfterDelete.length === countBefore - 1, 'Word count decreased by 1');
   assert(!wordsAfterDelete.find((w: any) => w.id === inserted.id), 'Deleted word is gone');
+
+  // Verify ON DELETE SET NULL for inserted_after_word_id
+  console.log('\n8b. Delete reference word sets inserted_after_word_id to null...');
+  const anchorWord = await request('/days/2026-02-09/words', {
+    method: 'POST',
+    body: JSON.stringify({ word: 'talc' }),
+  });
+  const dependentWord = await request('/days/2026-02-09/words', {
+    method: 'POST',
+    body: JSON.stringify({ word: 'cola', after_word_id: anchorWord.id }),
+  });
+  assert(dependentWord.inserted_after_word_id === anchorWord.id, 'Dependent word references anchor');
+  // Delete the anchor word
+  await request(`/days/2026-02-09/words/${anchorWord.id}`, { method: 'DELETE' });
+  // Re-fetch the dependent word and check that its reference is nulled
+  const wordsAfterAnchorDelete = await request('/days/2026-02-09/words');
+  const dependentAfter = wordsAfterAnchorDelete.find((w: any) => w.id === dependentWord.id);
+  assert(dependentAfter !== undefined, 'Dependent word still exists after anchor deletion');
+  assert(dependentAfter.inserted_after_word_id === null, 'inserted_after_word_id set to null after anchor deletion');
+  // Clean up: delete the dependent word
+  await request(`/days/2026-02-09/words/${dependentWord.id}`, { method: 'DELETE' });
 
   // 9. Delete day — cascade deletes all words
   console.log('\n9. Delete day cascade...');
