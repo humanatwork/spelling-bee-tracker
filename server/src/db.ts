@@ -4,8 +4,16 @@ import path from 'path';
 
 // Resolve relative to project root (two levels up from server/src/), not process.cwd(),
 // so the DB location is the same regardless of how the server is started.
+// In Electron production builds, use the app's user data directory.
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
-const DB_PATH = process.env.DB_PATH || path.join(PROJECT_ROOT, 'data', 'spelling-bee.db');
+function getDbPath(): string {
+  if (process.env.DB_PATH) return process.env.DB_PATH;
+  if (process.env.ELECTRON_USER_DATA) {
+    return path.join(process.env.ELECTRON_USER_DATA, 'spelling-bee.db');
+  }
+  return path.join(PROJECT_ROOT, 'data', 'spelling-bee.db');
+}
+const DB_PATH = getDbPath();
 
 let db: Database.Database | null = null;
 
