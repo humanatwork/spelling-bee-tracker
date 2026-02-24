@@ -2,6 +2,7 @@ interface Props {
   letters: string[];
   centerLetter: string;
   onLetterClick?: (letter: string) => void;
+  onShuffle?: () => void;
   size?: 'sm' | 'lg';
 }
 
@@ -37,7 +38,7 @@ function Hexagon({
   );
 }
 
-export function LetterHexagons({ letters, centerLetter, onLetterClick, size = 'sm' }: Props) {
+export function LetterHexagons({ letters, centerLetter, onLetterClick, onShuffle, size = 'sm' }: Props) {
   const outer = letters.filter(l => l !== centerLetter);
 
   if (size === 'sm') {
@@ -60,58 +61,71 @@ export function LetterHexagons({ letters, centerLetter, onLetterClick, size = 's
   const rowGap = size === 'lg' ? '-my-2' : '-my-1';
 
   return (
-    <div className={`flex flex-col items-center ${rowGap}`}>
-      {/* Top row: outer[1], outer[2] */}
-      <div className={`flex ${gap}`}>
-        <Hexagon
-          letter={outer[1] || ''}
-          isCenter={false}
-          onClick={onLetterClick ? () => onLetterClick(outer[1]) : undefined}
-          size="lg"
-        />
-        <Hexagon
-          letter={outer[2] || ''}
-          isCenter={false}
-          onClick={onLetterClick ? () => onLetterClick(outer[2]) : undefined}
-          size="lg"
-        />
+    <div className="flex flex-col items-center">
+      <div className={`flex flex-col items-center ${rowGap}`}>
+        {/* Top row: outer[1], outer[2] */}
+        <div className={`flex ${gap}`}>
+          <Hexagon
+            letter={outer[1] || ''}
+            isCenter={false}
+            onClick={onLetterClick ? () => onLetterClick(outer[1]) : undefined}
+            size="lg"
+          />
+          <Hexagon
+            letter={outer[2] || ''}
+            isCenter={false}
+            onClick={onLetterClick ? () => onLetterClick(outer[2]) : undefined}
+            size="lg"
+          />
+        </div>
+        {/* Middle row: outer[0], center, outer[3] */}
+        <div className={`flex ${gap}`}>
+          <Hexagon
+            letter={outer[0] || ''}
+            isCenter={false}
+            onClick={onLetterClick ? () => onLetterClick(outer[0]) : undefined}
+            size="lg"
+          />
+          <Hexagon
+            letter={centerLetter}
+            isCenter
+            onClick={onLetterClick ? () => onLetterClick(centerLetter) : undefined}
+            size="lg"
+          />
+          <Hexagon
+            letter={outer[3] || ''}
+            isCenter={false}
+            onClick={onLetterClick ? () => onLetterClick(outer[3]) : undefined}
+            size="lg"
+          />
+        </div>
+        {/* Bottom row: outer[5], outer[4] */}
+        <div className={`flex ${gap}`}>
+          <Hexagon
+            letter={outer[5] || ''}
+            isCenter={false}
+            onClick={onLetterClick ? () => onLetterClick(outer[5]) : undefined}
+            size="lg"
+          />
+          <Hexagon
+            letter={outer[4] || ''}
+            isCenter={false}
+            onClick={onLetterClick ? () => onLetterClick(outer[4]) : undefined}
+            size="lg"
+          />
+        </div>
       </div>
-      {/* Middle row: outer[0], center, outer[3] */}
-      <div className={`flex ${gap}`}>
-        <Hexagon
-          letter={outer[0] || ''}
-          isCenter={false}
-          onClick={onLetterClick ? () => onLetterClick(outer[0]) : undefined}
-          size="lg"
-        />
-        <Hexagon
-          letter={centerLetter}
-          isCenter
-          onClick={onLetterClick ? () => onLetterClick(centerLetter) : undefined}
-          size="lg"
-        />
-        <Hexagon
-          letter={outer[3] || ''}
-          isCenter={false}
-          onClick={onLetterClick ? () => onLetterClick(outer[3]) : undefined}
-          size="lg"
-        />
-      </div>
-      {/* Bottom row: outer[5], outer[4] */}
-      <div className={`flex ${gap}`}>
-        <Hexagon
-          letter={outer[5] || ''}
-          isCenter={false}
-          onClick={onLetterClick ? () => onLetterClick(outer[5]) : undefined}
-          size="lg"
-        />
-        <Hexagon
-          letter={outer[4] || ''}
-          isCenter={false}
-          onClick={onLetterClick ? () => onLetterClick(outer[4]) : undefined}
-          size="lg"
-        />
-      </div>
+      {onShuffle && (
+        <button
+          type="button"
+          onClick={onShuffle}
+          className="mt-3 px-3 py-1 text-sm text-gray-500 hover:text-gray-700
+            hover:bg-gray-100 rounded-full transition-colors"
+          title="Shuffle letters"
+        >
+          &#x27F3; Shuffle
+        </button>
+      )}
     </div>
   );
 }
