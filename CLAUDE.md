@@ -138,6 +138,9 @@ Use `gh pr create` with a body following this format:
 ## Test plan
 - [ ] <verification steps>
 
+## README
+- [ ] README.md updated (or confirmed no update needed)
+
 Closes #N
 ```
 
@@ -159,6 +162,7 @@ Before merging any branch to `main`, confirm all of the following:
 3. **Integration tests pass** — all suites in `npm run test:fresh` pass against a fresh database
 4. **No regressions** — if the change touches API routes, manually verify the affected endpoint returns expected data
 5. **PR test plan verified** — every checkbox in the PR's "Test plan" section must be manually performed and confirmed passing before merge. Automated tests alone are insufficient — they run on clean databases and may miss migration issues, UI regressions, or integration problems that only surface with real usage
+6. **README accurate** — if the change affects anything documented in `README.md` (API endpoints, data model, commands, shortcuts, tech stack), update README in the same branch. Run a quick diff of README's claims against the code you changed. Don't update README for pure internal refactors that don't change user-facing behavior or documented details.
 
 Do not merge with known failures. If a test needs to be updated because behavior intentionally changed, update the test *in the same branch* before merging.
 
