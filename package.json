@@ -11,10 +11,32 @@
     "build": "npm run build -w client && npm run build -w server",
     "start": "npm run start -w server",
     "test:fresh": "./scripts/test-fresh.sh",
-    "test:e2e": "rm -f data/test-e2e.db data/test-e2e.db-wal data/test-e2e.db-shm && npx playwright test"
+    "test:e2e": "rm -f data/test-e2e.db data/test-e2e.db-wal data/test-e2e.db-shm && npx playwright test",
+    "electron:dev": "NODE_ENV=development electron electron/dist/main.js",
+    "electron:build": "npm run build && tsc -p electron/tsconfig.json && electron-builder",
+    "electron:start": "electron electron/dist/main.js"
+  },
+  "build": {
+    "appId": "com.spelling-bee-tracker",
+    "productName": "Spelling Bee Tracker",
+    "mac": {
+      "category": "public.app-category.word-games",
+      "target": "dmg"
+    },
+    "files": [
+      "electron/dist/**/*",
+      "server/dist/**/*",
+      "client/dist/**/*",
+      "node_modules/**/*"
+    ],
+    "extraResources": [
+      { "from": "data/", "to": "data/" }
+    ]
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
-    "concurrently": "^9.1.0"
+    "concurrently": "^9.1.0",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
   }
 }
