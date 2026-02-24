@@ -48,6 +48,7 @@ function initSchema(db: Database.Database): void {
         CHECK(status IN ('pending', 'accepted', 'rejected')),
       points INTEGER,
       inserted_after_word_id INTEGER REFERENCES words(id) ON DELETE SET NULL,
+      status_from_word_id INTEGER REFERENCES words(id) ON DELETE SET NULL,
       created_at TEXT DEFAULT (datetime('now'))
     );
 
@@ -74,6 +75,9 @@ function hasColumn(db: Database.Database, table: string, column: string): boolea
 function migrateSchema(db: Database.Database): void {
   if (!hasColumn(db, 'words', 'inserted_after_word_id')) {
     db.exec('ALTER TABLE words ADD COLUMN inserted_after_word_id INTEGER REFERENCES words(id) ON DELETE SET NULL');
+  }
+  if (!hasColumn(db, 'words', 'status_from_word_id')) {
+    db.exec('ALTER TABLE words ADD COLUMN status_from_word_id INTEGER REFERENCES words(id) ON DELETE SET NULL');
   }
 }
 

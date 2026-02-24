@@ -63,6 +63,7 @@ DEFAULT_SUITES=(
   "server/src/test-word-updates.ts"
   "server/src/test-cascade-and-list.ts"
   "server/src/test-position-integrity.ts"
+  "server/src/test-auto-accept.ts"
   "server/src/test-schema-migration.ts"
 )
 

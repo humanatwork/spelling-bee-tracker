@@ -31,6 +31,7 @@ export interface Word {
   status: 'pending' | 'accepted' | 'rejected';
   points: number | null;
   inserted_after_word_id: number | null;
+  status_from_word_id: number | null;
   created_at: string;
 }
 

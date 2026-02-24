@@ -16,7 +16,26 @@ function formatWord(w: any) {
     ...w,
     is_pangram: !!w.is_pangram,
     inserted_after_word_id: w.inserted_after_word_id ?? null,
+    status_from_word_id: w.status_from_word_id ?? null,
   };
+}
+
+function mirrorStatusToDuplicates(dayId: number, primaryWordId: number, wordText: string, status: string): void {
+  const db = getDb();
+  db.prepare(`
+    UPDATE words
+    SET status = ?, status_from_word_id = ?, points = NULL
+    WHERE day_id = ? AND word = ? AND id != ? AND status = 'pending' AND status_from_word_id IS NULL
+  `).run(status, primaryWordId, dayId, wordText, primaryWordId);
+}
+
+function revertMirroredWords(primaryWordId: number): void {
+  const db = getDb();
+  db.prepare(`
+    UPDATE words
+    SET status = 'pending', status_from_word_id = NULL, points = NULL
+    WHERE status_from_word_id = ?
+  `).run(primaryWordId);
 }
 
 function validatePangram(word: string, day: any): string | null {
@@ -95,7 +114,7 @@ router.post('/', (req: Request, res: Response) => {
     }
   }
 
-  // Wrap position calculation + insert in a transaction for concurrency safety
+  // Wrap position calculation + insert + auto-mirror in a transaction
   const insertWord = db.transaction(() => {
     const position = after_word_id ? getPositionAfter(day.id, after_word_id) : getNextPosition(day.id);
 
@@ -106,7 +125,22 @@ router.post('/', (req: Request, res: Response) => {
       VALUES (?, ?, ?, ?, ?)
     `).run(day.id, normalizedWord, position, is_pangram ? 1 : 0, insertedAfterWordId);
 
-    return result.lastInsertRowid as number;
+    const newId = result.lastInsertRowid as number;
+
+    // Auto-mirror if a duplicate has already been manually decided
+    const decided = db.prepare(`
+      SELECT id, status FROM words
+      WHERE day_id = ? AND word = ? AND id != ? AND status != 'pending' AND status_from_word_id IS NULL
+      LIMIT 1
+    `).get(day.id, normalizedWord, newId) as { id: number; status: string } | undefined;
+
+    if (decided) {
+      db.prepare(`
+        UPDATE words SET status = ?, status_from_word_id = ?, points = NULL WHERE id = ?
+      `).run(decided.status, decided.id, newId);
+    }
+
+    return newId;
   });
 
   const wordId = insertWord();
@@ -125,15 +159,21 @@ router.patch('/:id', (req: Request, res: Response) => {
   }
 
   const wordId = parseInt(param(req.params.id));
-  const existing = db.prepare('SELECT * FROM words WHERE id = ? AND day_id = ?').get(wordId, day.id);
+  const existing = db.prepare('SELECT * FROM words WHERE id = ? AND day_id = ?').get(wordId, day.id) as any;
   if (!existing) {
     res.status(404).json({ error: 'Word not found' });
     return;
   }
 
+  // Block PATCH on mirrored words
+  if (existing.status_from_word_id != null) {
+    res.status(409).json({ error: 'Cannot modify a mirrored word directly' });
+    return;
+  }
+
   // Validate pangram designation
   if (req.body.is_pangram) {
-    const w = (existing as any).word;
+    const w = existing.word;
     const pangramError = validatePangram(w, day);
     if (pangramError) {
       res.status(400).json({ error: pangramError });
@@ -157,10 +197,27 @@ router.patch('/:id', (req: Request, res: Response) => {
     values.push(req.body.points);
   }
 
-  if (updates.length > 0) {
-    values.push(wordId);
-    db.prepare(`UPDATE words SET ${updates.join(', ')} WHERE id = ?`).run(...values);
-  }
+  const newStatus = req.body.status;
+  const oldStatus = existing.status;
+
+  const performUpdate = db.transaction(() => {
+    if (updates.length > 0) {
+      values.push(wordId);
+      db.prepare(`UPDATE words SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+    }
+
+    if (newStatus !== undefined && newStatus !== oldStatus) {
+      if (oldStatus !== 'pending') {
+        // Revert existing mirrors first (accepted→rejected or decided→pending)
+        revertMirroredWords(wordId);
+      }
+      if (newStatus === 'accepted' || newStatus === 'rejected') {
+        mirrorStatusToDuplicates(day.id, wordId, existing.word, newStatus);
+      }
+    }
+  });
+
+  performUpdate();
 
   const updated = db.prepare('SELECT * FROM words WHERE id = ?').get(wordId);
   res.json(formatWord(updated));
@@ -176,7 +233,13 @@ router.delete('/:id', (req: Request, res: Response) => {
   }
 
   const wordId = parseInt(param(req.params.id));
-  const result = db.prepare('DELETE FROM words WHERE id = ? AND day_id = ?').run(wordId, day.id);
+
+  const performDelete = db.transaction(() => {
+    revertMirroredWords(wordId);
+    return db.prepare('DELETE FROM words WHERE id = ? AND day_id = ?').run(wordId, day.id);
+  });
+
+  const result = performDelete();
   if (result.changes === 0) {
     res.status(404).json({ error: 'Word not found' });
     return;

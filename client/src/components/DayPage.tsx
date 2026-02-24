@@ -106,6 +106,7 @@ export function DayPage({ date, onBack }: Props) {
   }
 
   function handleWordClick(word: Word) {
+    if (word.status_from_word_id != null) return;
     setSelectedWordId(selectedWordId === word.id ? null : word.id);
     setPointsInput(word.points != null ? String(word.points) : '');
   }

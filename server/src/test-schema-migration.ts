@@ -76,11 +76,15 @@ async function main() {
   oldDb.prepare('INSERT INTO words (day_id, word, position, is_pangram) VALUES (?, ?, ?, ?)')
     .run(1, 'TOCK', 2.0, 0);
 
-  // Verify old schema does NOT have the new column
+  // Verify old schema does NOT have the new columns
   const oldCols = oldDb.prepare('PRAGMA table_info(words)').all() as Array<{ name: string }>;
   assert(
     !oldCols.some(c => c.name === 'inserted_after_word_id'),
     'Old schema does NOT have inserted_after_word_id column'
+  );
+  assert(
+    !oldCols.some(c => c.name === 'status_from_word_id'),
+    'Old schema does NOT have status_from_word_id column'
   );
 
   // Verify letter_reorders table does NOT exist
@@ -104,6 +108,10 @@ async function main() {
     newCols.some(c => c.name === 'inserted_after_word_id'),
     'Migration added inserted_after_word_id column'
   );
+  assert(
+    newCols.some(c => c.name === 'status_from_word_id'),
+    'Migration added status_from_word_id column'
+  );
 
   // Verify letter_reorders table was created
   const newTables = db.prepare(
@@ -122,18 +130,21 @@ async function main() {
   assert(words[0].word === 'TICK', 'First word is TICK');
   assert(words[1].word === 'TOCK', 'Second word is TOCK');
   assert(words[0].inserted_after_word_id === null, 'Existing word has null inserted_after_word_id');
+  assert((words[0] as any).status_from_word_id === null, 'Existing word has null status_from_word_id');
 
-  // 5. Verify INSERT with new column works on migrated DB
-  console.log('\n5. Verifying INSERT with new column on migrated DB...');
+  // 5. Verify INSERT with new columns works on migrated DB
+  console.log('\n5. Verifying INSERT with new columns on migrated DB...');
   db.prepare(`
-    INSERT INTO words (day_id, word, position, is_pangram, inserted_after_word_id)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(1, 'TOIL', 1.5, 0, words[0].id);
+    INSERT INTO words (day_id, word, position, is_pangram, inserted_after_word_id, status_from_word_id)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(1, 'TOIL', 1.5, 0, words[0].id, words[1].id);
 
   const toil = db.prepare('SELECT * FROM words WHERE word = ?').get('TOIL') as {
     inserted_after_word_id: number | null;
+    status_from_word_id: number | null;
   };
   assert(toil.inserted_after_word_id === words[0].id, 'New word can reference inserted_after_word_id');
+  assert(toil.status_from_word_id === words[1].id, 'New word can reference status_from_word_id');
 
   // 6. Verify migration is idempotent (running again does not crash or duplicate)
   console.log('\n6. Verifying migration is idempotent...');
@@ -141,7 +152,9 @@ async function main() {
   const db2 = getDb(); // triggers initSchema + migrateSchema again
   const cols2 = db2.prepare('PRAGMA table_info(words)').all() as Array<{ name: string }>;
   const colCount = cols2.filter(c => c.name === 'inserted_after_word_id').length;
-  assert(colCount === 1, 'Migration is idempotent (column exists exactly once)');
+  assert(colCount === 1, 'Migration is idempotent (inserted_after_word_id exists exactly once)');
+  const colCount2 = cols2.filter(c => c.name === 'status_from_word_id').length;
+  assert(colCount2 === 1, 'Migration is idempotent (status_from_word_id exists exactly once)');
 
   closeDb();
   cleanup();
