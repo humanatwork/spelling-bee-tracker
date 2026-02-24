@@ -30,6 +30,7 @@ export interface Word {
   is_pangram: boolean;
   status: 'pending' | 'accepted' | 'rejected';
   points: number | null;
+  inserted_after_word_id: number | null;
   created_at: string;
 }
 

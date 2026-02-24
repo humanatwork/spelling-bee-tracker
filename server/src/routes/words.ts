@@ -15,6 +15,7 @@ function formatWord(w: any) {
   return {
     ...w,
     is_pangram: !!w.is_pangram,
+    inserted_after_word_id: w.inserted_after_word_id ?? null,
   };
 }
 
@@ -98,10 +99,12 @@ router.post('/', (req: Request, res: Response) => {
   const insertWord = db.transaction(() => {
     const position = after_word_id ? getPositionAfter(day.id, after_word_id) : getNextPosition(day.id);
 
+    const insertedAfterWordId = after_word_id ?? null;
+
     const result = db.prepare(`
-      INSERT INTO words (day_id, word, position, is_pangram)
-      VALUES (?, ?, ?, ?)
-    `).run(day.id, normalizedWord, position, is_pangram ? 1 : 0);
+      INSERT INTO words (day_id, word, position, is_pangram, inserted_after_word_id)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(day.id, normalizedWord, position, is_pangram ? 1 : 0, insertedAfterWordId);
 
     return result.lastInsertRowid as number;
   });
