@@ -60,6 +60,21 @@ function initSchema(db: Database.Database): void {
       created_at TEXT DEFAULT (datetime('now'))
     );
   `);
+
+  // Migrations for existing databases — CREATE TABLE IF NOT EXISTS does not
+  // add new columns to tables that already exist.
+  migrateSchema(db);
+}
+
+function hasColumn(db: Database.Database, table: string, column: string): boolean {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  return cols.some(c => c.name === column);
+}
+
+function migrateSchema(db: Database.Database): void {
+  if (!hasColumn(db, 'words', 'inserted_after_word_id')) {
+    db.exec('ALTER TABLE words ADD COLUMN inserted_after_word_id INTEGER REFERENCES words(id) ON DELETE SET NULL');
+  }
 }
 
 export function closeDb(): void {
