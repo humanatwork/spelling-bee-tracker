@@ -9,4 +9,5 @@ data/
 .env
 .DS_Store
 .claude/
+CLAUDE.md
 test-results/
