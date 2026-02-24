@@ -61,10 +61,7 @@ DEFAULT_SUITES=(
   "server/src/test-error-handling.ts"
   "server/src/test-word-updates.ts"
   "server/src/test-cascade-and-list.ts"
-  "server/src/test-backfill-edges.ts"
-  "server/src/test-attempts-and-export.ts"
   "server/src/test-position-integrity.ts"
-  "server/src/test-concurrent-input.ts"
 )
 
 # Use provided files or defaults

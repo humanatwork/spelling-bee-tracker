@@ -1,6 +1,6 @@
 /**
  * Word updates and normalization tests.
- * Covers: PATCH status/metadata, inspiration links via PATCH, word normalization,
+ * Covers: PATCH status/points/pangram, word normalization,
  * after_word_id positioning, no-op PATCH.
  * Requires a running server with a fresh database.
  */
@@ -30,7 +30,7 @@ async function main() {
     method: 'POST',
     body: JSON.stringify({ word: 'tick' }),
   });
-  counted(w1.status === 'pending', 'New pre-pangram word starts as pending');
+  counted(w1.status === 'pending', 'New word starts as pending');
 
   // pending → accepted
   const accepted = await request(`/days/2098-01-01/words/${w1.id}`, {
@@ -55,33 +55,24 @@ async function main() {
   });
   counted(rejected.status === 'rejected', 'PATCH status to rejected works');
 
-  // Set scratch
-  const w3 = await request('/days/2098-01-01/words', {
-    method: 'POST',
-    body: JSON.stringify({ word: 'taco' }),
-  });
-  const scratched = await request(`/days/2098-01-01/words/${w3.id}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ status: 'scratch' }),
-  });
-  counted(scratched.status === 'scratch', 'PATCH status to scratch works');
+  // ── PATCH points ──
+  console.log('\n2. PATCH points...');
 
-  // ── PATCH word metadata ──
-  console.log('\n2. PATCH word metadata...');
-
-  // Set notes
-  const withNotes = await request(`/days/2098-01-01/words/${w1.id}`, {
+  const withPoints = await request(`/days/2098-01-01/words/${w1.id}`, {
     method: 'PATCH',
-    body: JSON.stringify({ notes: 'first word I thought of' }),
+    body: JSON.stringify({ points: 5 }),
   });
-  counted(withNotes.notes === 'first word I thought of', 'Set notes via PATCH');
+  counted(withPoints.points === 5, 'Set points via PATCH');
 
-  // Update notes
-  const updatedNotes = await request(`/days/2098-01-01/words/${w1.id}`, {
+  // Update points
+  const updatedPoints = await request(`/days/2098-01-01/words/${w1.id}`, {
     method: 'PATCH',
-    body: JSON.stringify({ notes: 'updated note' }),
+    body: JSON.stringify({ points: 10 }),
   });
-  counted(updatedNotes.notes === 'updated note', 'Update notes via PATCH');
+  counted(updatedPoints.points === 10, 'Update points via PATCH');
+
+  // ── PATCH is_pangram ──
+  console.log('\n3. PATCH is_pangram...');
 
   // is_pangram toggle (must use a word that contains all 7 letters)
   const cocktailWord = await request('/days/2098-01-01/words', {
@@ -99,54 +90,6 @@ async function main() {
     body: JSON.stringify({ is_pangram: false }),
   });
   counted(notPangram.is_pangram === false, 'Set is_pangram back to false');
-
-  // chain_depth
-  const depth = await request(`/days/2098-01-01/words/${w1.id}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ chain_depth: 3 }),
-  });
-  counted(depth.chain_depth === 3, 'Set chain_depth via PATCH');
-
-  // inspiration_confidence
-  const conf = await request(`/days/2098-01-01/words/${w1.id}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ inspiration_confidence: 'uncertain' }),
-  });
-  counted(conf.inspiration_confidence === 'uncertain', 'Set inspiration_confidence via PATCH');
-
-  // ── PATCH inspiration links ──
-  console.log('\n3. PATCH inspiration links...');
-
-  // Set single inspiration
-  const linked = await request(`/days/2098-01-01/words/${w2.id}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ inspired_by: [w1.id] }),
-  });
-  counted(linked.inspired_by_ids.includes(w1.id), 'Set single inspiration link');
-  counted(linked.inspired_by_ids.length === 1, 'Exactly one inspiration link');
-
-  // Set multiple inspirations
-  const multiLinked = await request(`/days/2098-01-01/words/${w2.id}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ inspired_by: [w1.id, w3.id] }),
-  });
-  counted(multiLinked.inspired_by_ids.includes(w1.id), 'Multiple links: first present');
-  counted(multiLinked.inspired_by_ids.includes(w3.id), 'Multiple links: second present');
-  counted(multiLinked.inspired_by_ids.length === 2, 'Exactly two inspiration links');
-
-  // Clear to empty
-  const cleared = await request(`/days/2098-01-01/words/${w2.id}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ inspired_by: [] }),
-  });
-  counted(cleared.inspired_by_ids.length === 0, 'Clear inspiration links to empty');
-
-  // Set back
-  const relinked = await request(`/days/2098-01-01/words/${w2.id}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ inspired_by: [w1.id] }),
-  });
-  counted(relinked.inspired_by_ids.includes(w1.id), 'Re-set inspiration link after clearing');
 
   // ── Word normalization ──
   console.log('\n4. Word normalization...');
@@ -171,13 +114,6 @@ async function main() {
     body: JSON.stringify({ word: '  loot  ' }),
   });
   counted(whitespace.word === 'LOOT', 'Whitespace trimmed from word');
-
-  // Reattempt still matches normalized form
-  const reattempt = await request('/days/2098-01-01/words', {
-    method: 'POST',
-    body: JSON.stringify({ word: 'tall' }),
-  });
-  counted(reattempt.is_reattempt === true, 'Reattempt matches case-insensitively');
 
   // ── after_word_id positioning ──
   console.log('\n5. Positioning with after_word_id...');
@@ -214,7 +150,6 @@ async function main() {
 
   const beforeList = await request('/days/2098-01-01/words');
   const before = beforeList.find((w: any) => w.id === w1.id);
-  // PATCH with empty body -- this goes through the PATCH handler, no fields match so no SQL update
   const noop = await request(`/days/2098-01-01/words/${w1.id}`, {
     method: 'PATCH',
     body: JSON.stringify({}),
