@@ -7,7 +7,7 @@ export default function App() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   return (
-    <div className="min-h-screen bg-gray-50 py-6 px-4">
+    <div className="min-h-screen bg-white py-6 px-4">
       <ToastContainer />
       {selectedDate ? (
         <DayPage

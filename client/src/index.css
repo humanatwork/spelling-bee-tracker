@@ -4,24 +4,18 @@
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background-color: #fafafa;
+  background-color: #ffffff;
 }
 
 @layer components {
   .word-accepted {
-    @apply text-green-700 bg-green-50;
+    @apply text-green-700;
   }
   .word-rejected {
-    @apply text-red-500 bg-red-50 line-through;
+    @apply text-red-400 line-through;
   }
   .word-pending {
-    @apply text-gray-700 bg-gray-50;
-  }
-  .word-scratch {
-    @apply text-gray-400 bg-gray-50 italic;
-  }
-  .word-pangram {
-    @apply font-bold text-amber-600;
+    @apply text-gray-700;
   }
 }
 
