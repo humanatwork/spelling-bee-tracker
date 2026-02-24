@@ -52,6 +52,13 @@ function initSchema(db: Database.Database): void {
     );
 
     CREATE INDEX IF NOT EXISTS idx_words_day_position ON words(day_id, position);
+
+    CREATE TABLE IF NOT EXISTS letter_reorders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      day_id INTEGER NOT NULL REFERENCES days(id) ON DELETE CASCADE,
+      letter_order TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
   `);
 }
 
