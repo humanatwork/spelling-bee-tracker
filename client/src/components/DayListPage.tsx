@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api, Day } from '../api';
+import { LetterHexagons } from './LetterHexagons';
 import { showToast } from './Toast';
 
 interface Props {
@@ -52,18 +53,6 @@ export function DayListPage({ onSelectDay }: Props) {
       showToast(e.message, 'warning');
     }
   }
-
-  const stageLabels: Record<string, string> = {
-    'pre-pangram': 'Pre-Pangram',
-    'backfill': 'Backfill',
-    'new-discovery': 'New Discovery',
-  };
-
-  const stageColors: Record<string, string> = {
-    'pre-pangram': 'bg-amber-100 text-amber-800',
-    'backfill': 'bg-blue-100 text-blue-800',
-    'new-discovery': 'bg-green-100 text-green-800',
-  };
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -138,27 +127,18 @@ export function DayListPage({ onSelectDay }: Props) {
             >
               <div className="flex-1">
                 <div className="font-semibold text-gray-800">{day.date}</div>
-                <div className="flex items-center gap-2 mt-1">
-                  <div className="flex gap-1">
-                    <span className="inline-flex items-center justify-center w-6 h-6 rounded bg-bee-yellow text-bee-dark font-bold text-xs">
-                      {day.center_letter}
-                    </span>
-                    {day.letters.filter(l => l !== day.center_letter).map(l => (
-                      <span key={l} className="inline-flex items-center justify-center w-6 h-6 rounded bg-gray-200 text-gray-700 font-medium text-xs">
-                        {l}
-                      </span>
-                    ))}
-                  </div>
+                <div className="mt-1">
+                  <LetterHexagons letters={day.letters} centerLetter={day.center_letter} size="sm" />
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${stageColors[day.current_stage]}`}>
-                  {stageLabels[day.current_stage]}
-                </span>
-                {day.genius_achieved && (
-                  <span className="text-xs text-amber-600 font-medium">Genius</span>
+              <div className="flex items-center gap-3 text-sm text-gray-500">
+                {(day.total_points ?? 0) > 0 && (
+                  <span className="font-medium text-green-600">{day.total_points} pts</span>
                 )}
-                <span className="text-sm text-gray-500">{day.word_count} words</span>
+                <span>{day.word_count ?? 0} words</span>
+                {(day.pangram_count ?? 0) > 0 && (
+                  <span className="text-amber-600">{day.pangram_count} pgm</span>
+                )}
               </div>
             </button>
           ))}
