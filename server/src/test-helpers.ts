@@ -3,13 +3,15 @@
  * Pattern: HTTP requests against a running server, assert() with descriptive messages.
  */
 
-export const BASE = 'http://localhost:3141/api';
+const PORT = process.env.PORT || '3141';
+export const BASE = `http://localhost:${PORT}/api`;
 
 export async function request(path: string, options?: RequestInit): Promise<any> {
   const res = await fetch(`${BASE}${path}`, {
     headers: { 'Content-Type': 'application/json' },
     ...options,
   });
+  if (res.status === 204) return null;
   const data: any = await res.json();
   if (!res.ok) throw new Error(`${res.status}: ${data.error}`);
   return data;

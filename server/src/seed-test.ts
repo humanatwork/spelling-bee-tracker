@@ -4,26 +4,7 @@
  * delete word, cascade delete, total points in list, letter reorder.
  */
 
-const BASE = 'http://localhost:3141/api';
-
-async function request(path: string, options?: RequestInit): Promise<any> {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  });
-  if (res.status === 204) return null;
-  const data: any = await res.json();
-  if (!res.ok) throw new Error(`${res.status}: ${data.error}`);
-  return data;
-}
-
-function assert(condition: boolean, msg: string) {
-  if (!condition) {
-    console.error(`FAIL: ${msg}`);
-    process.exit(1);
-  }
-  console.log(`  OK: ${msg}`);
-}
+import { request, assert, BASE } from './test-helpers';
 
 async function main() {
   console.log('=== Spelling Bee Tracker Verification ===\n');
