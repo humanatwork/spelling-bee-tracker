@@ -1,6 +1,5 @@
 import { Router, Request, Response } from 'express';
 import { getDb } from '../db';
-import { writeExport, removeExport } from '../export';
 
 const router = Router();
 
@@ -13,9 +12,11 @@ router.get('/', (_req: Request, res: Response) => {
   const db = getDb();
   const days = db.prepare(`
     SELECT d.*,
-      (SELECT COUNT(*) FROM words w WHERE w.day_id = d.id) as word_count,
-      (SELECT COUNT(*) FROM words w WHERE w.day_id = d.id AND w.is_pangram = 1) as pangram_count
-    FROM days d ORDER BY d.date DESC
+      COUNT(w.id) as word_count,
+      SUM(CASE WHEN w.is_pangram = 1 THEN 1 ELSE 0 END) as pangram_count,
+      COALESCE(SUM(CASE WHEN w.status = 'accepted' THEN w.points ELSE 0 END), 0) as total_points
+    FROM days d LEFT JOIN words w ON w.day_id = d.id
+    GROUP BY d.id ORDER BY d.date DESC
   `).all();
 
   res.json(days.map(formatDay));
@@ -47,7 +48,6 @@ router.post('/', (req: Request, res: Response) => {
     `).run(date, JSON.stringify(normalizedLetters), center_letter);
 
     const day = db.prepare('SELECT * FROM days WHERE id = ?').get(result.lastInsertRowid);
-    writeExport(date);
     res.status(201).json(formatDay(day));
   } catch (e: any) {
     if (e.message?.includes('UNIQUE constraint')) {
@@ -71,66 +71,6 @@ router.get('/:date', (req: Request, res: Response) => {
   res.json(formatDay(day));
 });
 
-// PATCH /api/days/:date - update a day
-router.patch('/:date', (req: Request, res: Response) => {
-  const db = getDb();
-  const day = db.prepare('SELECT * FROM days WHERE date = ?').get(param(req.params.date)) as any;
-
-  if (!day) {
-    res.status(404).json({ error: 'Day not found' });
-    return;
-  }
-
-  const updates: string[] = [];
-  const values: any[] = [];
-
-  if (req.body.current_stage !== undefined) {
-    const stageOrder: Record<string, number> = {
-      'pre-pangram': 0,
-      'backfill': 1,
-      'new-discovery': 2,
-    };
-    const currentOrder = stageOrder[day.current_stage];
-    const newOrder = stageOrder[req.body.current_stage];
-    if (newOrder === undefined) {
-      res.status(400).json({ error: `Invalid stage: ${req.body.current_stage}` });
-      return;
-    }
-    if (newOrder < currentOrder) {
-      res.status(400).json({ error: `Cannot transition backward from ${day.current_stage} to ${req.body.current_stage}` });
-      return;
-    }
-    if (newOrder > currentOrder + 1) {
-      res.status(400).json({ error: `Cannot skip stages: ${day.current_stage} to ${req.body.current_stage}` });
-      return;
-    }
-    // Same stage is a no-op, but we still add the update (harmless)
-    updates.push('current_stage = ?');
-    values.push(req.body.current_stage);
-  }
-  if (req.body.genius_achieved !== undefined) {
-    updates.push('genius_achieved = ?');
-    values.push(req.body.genius_achieved ? 1 : 0);
-  }
-  if (req.body.backfill_cursor_word_id !== undefined) {
-    updates.push('backfill_cursor_word_id = ?');
-    values.push(req.body.backfill_cursor_word_id);
-  }
-
-  if (updates.length === 0) {
-    res.json(formatDay(day));
-    return;
-  }
-
-  updates.push("updated_at = datetime('now')");
-  values.push(day.id);
-
-  db.prepare(`UPDATE days SET ${updates.join(', ')} WHERE id = ?`).run(...values);
-  const updated = db.prepare('SELECT * FROM days WHERE id = ?').get(day.id);
-  writeExport(param(req.params.date));
-  res.json(formatDay(updated));
-});
-
 // DELETE /api/days/:date - delete a day
 router.delete('/:date', (req: Request, res: Response) => {
   const db = getDb();
@@ -140,91 +80,13 @@ router.delete('/:date', (req: Request, res: Response) => {
     res.status(404).json({ error: 'Day not found' });
     return;
   }
-  removeExport(date);
   res.status(204).send();
-});
-
-// GET /api/days/:date/export - full day data as clean JSON
-router.get('/:date/export', (req: Request, res: Response) => {
-  const db = getDb();
-  const day = db.prepare('SELECT * FROM days WHERE date = ?').get(param(req.params.date)) as any;
-
-  if (!day) {
-    res.status(404).json({ error: 'Day not found' });
-    return;
-  }
-
-  const words = db.prepare(`
-    SELECT w.*,
-      (SELECT json_group_array(wi.inspired_by_word_id) FROM word_inspirations wi WHERE wi.word_id = w.id) as inspired_by_ids
-    FROM words w WHERE w.day_id = ? ORDER BY w.position
-  `).all(day.id);
-
-  const attempts = db.prepare(`
-    SELECT wa.* FROM word_attempts wa
-    JOIN words w ON wa.word_id = w.id
-    WHERE w.day_id = ? ORDER BY wa.attempted_at
-  `).all(day.id);
-
-  const letters: string[] = JSON.parse(day.letters);
-  const centerLetter = day.center_letter;
-
-  res.json({
-    ...formatDay(day),
-    words: words.map((w: any) => {
-      const wordUpper = (w.word as string).toUpperCase();
-      const hasCenterLetter = wordUpper.includes(centerLetter);
-      const allLettersValid = [...wordUpper].every(ch => letters.includes(ch));
-      return {
-        ...w,
-        is_pangram: !!w.is_pangram,
-        inspired_by_ids: JSON.parse(w.inspired_by_ids).filter((id: any) => id !== null),
-        valid: hasCenterLetter && allLettersValid,
-      };
-    }),
-    attempts,
-  });
-});
-
-// GET /api/days/:date/attractors - words with multiple attempts
-router.get('/:date/attractors', (req: Request, res: Response) => {
-  const db = getDb();
-  const day = db.prepare('SELECT * FROM days WHERE date = ?').get(param(req.params.date)) as any;
-
-  if (!day) {
-    res.status(404).json({ error: 'Day not found' });
-    return;
-  }
-
-  const attractors = db.prepare(`
-    SELECT w.*, COUNT(wa.id) as attempt_count
-    FROM words w
-    JOIN word_attempts wa ON wa.word_id = w.id
-    WHERE w.day_id = ?
-    GROUP BY w.id
-    HAVING attempt_count > 1
-    ORDER BY attempt_count DESC
-  `).all(day.id);
-
-  res.json(attractors.map((a: any) => ({
-    ...a,
-    is_pangram: !!a.is_pangram,
-  })));
-});
-
-// Phase 2 stubs
-router.get('/:date/stats', (_req: Request, res: Response) => {
-  res.status(501).json({ error: 'Stats not implemented yet (phase 2)' });
-});
-router.get('/:date/graph', (_req: Request, res: Response) => {
-  res.status(501).json({ error: 'Graph not implemented yet (phase 2)' });
 });
 
 function formatDay(day: any) {
   return {
     ...day,
     letters: JSON.parse(day.letters),
-    genius_achieved: !!day.genius_achieved,
   };
 }
 

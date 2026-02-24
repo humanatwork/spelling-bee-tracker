@@ -1,7 +1,7 @@
 /**
  * Cascade delete and day list tests.
- * Covers: GET /api/days list (empty, ordering, counts), DELETE cascade
- * (words, inspirations, attempts all removed), re-creation after delete.
+ * Covers: GET /api/days list (empty, ordering, counts, total_points),
+ * DELETE cascade (words removed), re-creation after delete.
  * Requires a running server with a fresh database.
  */
 
@@ -46,63 +46,56 @@ async function main() {
   counted(list[0].date === '2097-03-03', 'Most recent date is first');
   counted(list[2].date === '2097-03-01', 'Oldest date is last');
 
-  // word_count and pangram_count should be present
+  // word_count, pangram_count, and total_points should be present
   counted(list[0].word_count === 0, 'New day has word_count 0');
   counted(list[0].pangram_count === 0, 'New day has pangram_count 0');
+  counted(list[0].total_points === 0, 'New day has total_points 0');
 
-  // Add words to verify counts
-  await request('/days/2097-03-01/words', {
+  // Add words and set points to verify counts
+  const w1 = await request('/days/2097-03-01/words', {
     method: 'POST',
     body: JSON.stringify({ word: 'tick' }),
   });
-  await request('/days/2097-03-01/words', {
+  await request(`/days/2097-03-01/words/${w1.id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status: 'accepted', points: 4 }),
+  });
+  const w2 = await request('/days/2097-03-01/words', {
     method: 'POST',
     body: JSON.stringify({ word: 'cocktail', is_pangram: true }),
+  });
+  await request(`/days/2097-03-01/words/${w2.id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status: 'accepted', points: 14 }),
   });
 
   const listWithWords = await request('/days');
   const day01 = listWithWords.find((d: any) => d.date === '2097-03-01');
   counted(day01.word_count === 2, 'Day with 2 words shows word_count 2');
   counted(day01.pangram_count === 1, 'Day with 1 pangram shows pangram_count 1');
+  counted(day01.total_points === 18, 'Day with accepted words shows total_points 18');
 
   // ── Cascade delete ──
   console.log('\n3. Cascade delete...');
 
-  // Build up a day with words, inspiration links, and attempts
-  const cascadeDay = await request('/days', {
+  // Build up a day with words
+  await request('/days', {
     method: 'POST',
     body: JSON.stringify({ date: '2097-04-01', letters: ['T', 'I', 'A', 'O', 'L', 'K', 'C'] }),
   });
 
-  const cw1 = await request('/days/2097-04-01/words', {
-    method: 'POST',
-    body: JSON.stringify({ word: 'tick' }),
-  });
-  const cw2 = await request('/days/2097-04-01/words', {
-    method: 'POST',
-    body: JSON.stringify({ word: 'tock' }),
-  });
-
-  // Add inspiration link: tock <- tick
-  await request(`/days/2097-04-01/words/${cw2.id}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ inspired_by: [cw1.id] }),
-  });
-
-  // Add a reattempt to create an additional word_attempts row
   await request('/days/2097-04-01/words', {
     method: 'POST',
     body: JSON.stringify({ word: 'tick' }),
+  });
+  await request('/days/2097-04-01/words', {
+    method: 'POST',
+    body: JSON.stringify({ word: 'tock' }),
   });
 
   // Verify data exists before delete
   const wordsBeforeDelete = await request('/days/2097-04-01/words');
   counted(wordsBeforeDelete.length === 2, 'Cascade day has 2 words before delete');
-  const tockBefore = wordsBeforeDelete.find((w: any) => w.word === 'TOCK');
-  counted(tockBefore.inspired_by_ids.length === 1, 'Inspiration link exists before delete');
-
-  const attemptsBefore = await request(`/days/2097-04-01/words/${cw1.id}/attempts`);
-  counted(attemptsBefore.length === 2, 'TICK has 2 attempts before delete');
 
   // DELETE the day
   const deleteResult = await requestRaw('/days/2097-04-01', { method: 'DELETE' });
