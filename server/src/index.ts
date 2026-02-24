@@ -6,7 +6,7 @@ import wordsRouter from './routes/words';
 import { getDb, closeDb } from './db';
 
 const app = express();
-const PORT = 3141;
+const PORT = parseInt(process.env.PORT || '3141', 10);
 
 app.use(cors());
 app.use(express.json());
