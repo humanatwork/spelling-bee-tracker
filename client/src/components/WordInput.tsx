@@ -1,6 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 
 interface Props {
+  value: string;
+  onChange: (value: string) => void;
   onSubmit: (word: string) => void;
   letters?: string[];
   centerLetter?: string;
@@ -9,9 +11,7 @@ interface Props {
   disabled?: boolean;
 }
 
-export function WordInput({ onSubmit, letters, centerLetter, placeholder = 'Type a word...', autoFocus = true, disabled = false }: Props) {
-  const [value, setValue] = useState('');
-  const [warning, setWarning] = useState('');
+export function WordInput({ value, onChange, onSubmit, letters, centerLetter, placeholder = 'Type a word...', autoFocus = true, disabled = false }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -37,22 +37,15 @@ export function WordInput({ onSubmit, letters, centerLetter, placeholder = 'Type
     return '';
   }
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const v = e.target.value;
-    setValue(v);
-    setWarning(validate(v));
-  }
-
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = value.trim();
-    if (!trimmed) return;
-    if (trimmed.length < 4) return;
+    if (!trimmed || trimmed.length < 4) return;
     onSubmit(trimmed);
-    setValue('');
-    setWarning('');
     inputRef.current?.focus();
   }
+
+  const warning = validate(value);
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-1">
@@ -61,7 +54,7 @@ export function WordInput({ onSubmit, letters, centerLetter, placeholder = 'Type
           ref={inputRef}
           type="text"
           value={value}
-          onChange={handleChange}
+          onChange={e => onChange(e.target.value)}
           placeholder={placeholder}
           disabled={disabled}
           data-testid="word-input"
@@ -78,12 +71,19 @@ export function WordInput({ onSubmit, letters, centerLetter, placeholder = 'Type
           className="px-4 py-2 bg-bee-yellow text-bee-dark font-semibold rounded-lg
             hover:bg-bee-gold transition-colors disabled:opacity-50"
         >
-          Add
+          Enter
         </button>
       </div>
       {warning && (
-        <span data-testid="validation-warning" className="text-xs text-amber-600">{warning} (soft warning — submit anyway)</span>
+        <span data-testid="validation-warning" className="text-xs text-amber-600">{warning} (soft warning)</span>
       )}
     </form>
   );
+
+  // Expose focus method
+}
+
+export function focusWordInput() {
+  const input = document.querySelector('[data-testid="word-input"]') as HTMLInputElement | null;
+  input?.focus();
 }
