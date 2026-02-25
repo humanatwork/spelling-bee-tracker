@@ -113,7 +113,13 @@ export function DayPage({ date, onBack }: Props) {
 
   async function handleAccept() {
     if (!selectedWordId) return;
-    const pts = pointsInput ? parseInt(pointsInput) : undefined;
+    if (pointsInput) {
+      if (!/^\d+$/.test(pointsInput)) {
+        showToast('Points must be a whole number', 'warning');
+        return;
+      }
+    }
+    const pts = pointsInput ? parseInt(pointsInput, 10) : undefined;
     try {
       await api.updateWord(date, selectedWordId, {
         status: 'accepted',
@@ -124,6 +130,13 @@ export function DayPage({ date, onBack }: Props) {
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Failed to accept word';
       showToast(message, 'warning');
+    }
+  }
+
+  function handlePointsKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (pointsInput) handleAccept();
     }
   }
 
@@ -308,9 +321,12 @@ export function DayPage({ date, onBack }: Props) {
             <span className="font-mono font-bold text-sm">{selectedWord.word}</span>
             <div className="flex items-center gap-1">
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={pointsInput}
                 onChange={e => setPointsInput(e.target.value)}
+                onKeyDown={handlePointsKeyDown}
                 placeholder="pts"
                 className="w-16 px-2 py-1 text-xs border rounded"
               />
