@@ -188,6 +188,14 @@ async function main() {
   const withPoints = tickWords.filter((w: any) => w.points != null);
   counted(withPoints.length === 1, 'Only 1 TICK word has non-null points');
 
+  // ── 8b. Day list total_points excludes mirrored words ──
+  console.log('\n8b. Day list total_points excludes mirrored words...');
+
+  const dayList = await request('/days');
+  const mirrorDay = dayList.find((d: any) => d.date === '2098-06-01');
+  counted(mirrorDay !== undefined, 'Mirror test day found in day list');
+  counted(mirrorDay.total_points === 3, `total_points is 3 (only primary counted), got ${mirrorDay.total_points}`);
+
   // ── 9. Accept a later instance (not first by position) → others still mirror ──
   console.log('\n9. Accept later instance → others mirror correctly...');
 
