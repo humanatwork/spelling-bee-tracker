@@ -79,6 +79,31 @@ function migrateSchema(db: Database.Database): void {
   if (!hasColumn(db, 'words', 'status_from_word_id')) {
     db.exec('ALTER TABLE words ADD COLUMN status_from_word_id INTEGER REFERENCES words(id) ON DELETE SET NULL');
   }
+
+  // Backfill: mirror existing pending duplicates of already-decided words.
+  // Idempotent — only touches rows that are pending with no status_from_word_id.
+  db.exec(`
+    UPDATE words
+    SET status = (
+      SELECT w2.status FROM words w2
+      WHERE w2.day_id = words.day_id AND w2.word = words.word
+        AND w2.status != 'pending' AND w2.status_from_word_id IS NULL AND w2.id != words.id
+      LIMIT 1
+    ),
+    status_from_word_id = (
+      SELECT w2.id FROM words w2
+      WHERE w2.day_id = words.day_id AND w2.word = words.word
+        AND w2.status != 'pending' AND w2.status_from_word_id IS NULL AND w2.id != words.id
+      LIMIT 1
+    ),
+    points = NULL
+    WHERE status = 'pending' AND status_from_word_id IS NULL
+      AND EXISTS (
+        SELECT 1 FROM words w2
+        WHERE w2.day_id = words.day_id AND w2.word = words.word
+          AND w2.status != 'pending' AND w2.status_from_word_id IS NULL AND w2.id != words.id
+      )
+  `);
 }
 
 export function closeDb(): void {
