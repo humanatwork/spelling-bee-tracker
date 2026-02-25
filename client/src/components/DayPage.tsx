@@ -21,6 +21,7 @@ export function DayPage({ date, onBack }: Props) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [pointsInput, setPointsInput] = useState('');
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
 
   const loadDay = useCallback(async () => {
     try {
@@ -47,11 +48,7 @@ export function DayPage({ date, onBack }: Props) {
       const data: { word: string; is_pangram?: boolean; after_word_id?: number } = { word };
       if (insertAfterWordId !== undefined) {
         if (insertAfterWordId === null) {
-          // Insert at top: use after_word_id of 0 won't work, so we handle differently
-          // Actually, after_word_id=null means "append". For insert-at-top, we'd need position logic.
-          // The server's getPositionAfter with a non-existent ID falls back to getNextPosition.
-          // For simplicity, just don't pass after_word_id (appends) — the insert buttons
-          // set insertAfterWordId to a real word id, not null for "top".
+          // null means "top" — omit after_word_id so server appends
         } else {
           data.after_word_id = insertAfterWordId;
         }
@@ -112,7 +109,7 @@ export function DayPage({ date, onBack }: Props) {
   }
 
   async function handleAccept() {
-    if (!selectedWordId) return;
+    if (!selectedWordId || busy) return;
     if (pointsInput) {
       if (!/^\d+$/.test(pointsInput)) {
         showToast('Points must be a whole number', 'warning');
@@ -120,6 +117,7 @@ export function DayPage({ date, onBack }: Props) {
       }
     }
     const pts = pointsInput ? parseInt(pointsInput, 10) : undefined;
+    setBusy(true);
     try {
       await api.updateWord(date, selectedWordId, {
         status: 'accepted',
@@ -130,6 +128,8 @@ export function DayPage({ date, onBack }: Props) {
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Failed to accept word';
       showToast(message, 'warning');
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -141,7 +141,8 @@ export function DayPage({ date, onBack }: Props) {
   }
 
   async function handleReject() {
-    if (!selectedWordId) return;
+    if (!selectedWordId || busy) return;
+    setBusy(true);
     try {
       await api.updateWord(date, selectedWordId, { status: 'rejected' });
       setSelectedWordId(null);
@@ -149,24 +150,30 @@ export function DayPage({ date, onBack }: Props) {
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Failed to reject word';
       showToast(message, 'warning');
+    } finally {
+      setBusy(false);
     }
   }
 
   async function handleTogglePangram() {
-    if (!selectedWordId) return;
+    if (!selectedWordId || busy) return;
     const word = words.find(w => w.id === selectedWordId);
     if (!word) return;
+    setBusy(true);
     try {
       await api.updateWord(date, selectedWordId, { is_pangram: !word.is_pangram });
       await loadDay();
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Failed to toggle pangram';
       showToast(message, 'warning');
+    } finally {
+      setBusy(false);
     }
   }
 
   async function handleDeleteWord() {
-    if (!selectedWordId) return;
+    if (!selectedWordId || busy) return;
+    setBusy(true);
     try {
       await api.deleteWord(date, selectedWordId);
       setSelectedWordId(null);
@@ -174,10 +181,14 @@ export function DayPage({ date, onBack }: Props) {
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Failed to delete word';
       showToast(message, 'warning');
+    } finally {
+      setBusy(false);
     }
   }
 
   async function handleDeleteDay() {
+    if (busy) return;
+    setBusy(true);
     try {
       await api.deleteDay(date);
       showToast('Day deleted', 'info');
@@ -185,6 +196,8 @@ export function DayPage({ date, onBack }: Props) {
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Failed to delete day';
       showToast(message, 'warning');
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -242,7 +255,8 @@ export function DayPage({ date, onBack }: Props) {
               <button
                 data-testid="delete-confirm-yes"
                 onClick={handleDeleteDay}
-                className="px-1.5 py-0.5 bg-red-500 text-white rounded font-medium hover:bg-red-600"
+                disabled={busy}
+                className="px-1.5 py-0.5 bg-red-500 text-white rounded font-medium hover:bg-red-600 disabled:opacity-50"
               >
                 Yes
               </button>
@@ -332,26 +346,30 @@ export function DayPage({ date, onBack }: Props) {
               />
               <button
                 onClick={handleAccept}
-                className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 font-medium"
+                disabled={busy}
+                className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 font-medium disabled:opacity-50"
               >
                 Accept
               </button>
             </div>
             <button
               onClick={handleReject}
-              className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 font-medium"
+              disabled={busy}
+              className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 font-medium disabled:opacity-50"
             >
               Reject
             </button>
             <button
               onClick={handleTogglePangram}
-              className="px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded hover:bg-amber-200 font-medium"
+              disabled={busy}
+              className="px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded hover:bg-amber-200 font-medium disabled:opacity-50"
             >
               {selectedWord.is_pangram ? 'Unmark Pangram' : 'Mark Pangram'}
             </button>
             <button
               onClick={handleDeleteWord}
-              className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded hover:bg-gray-200 font-medium"
+              disabled={busy}
+              className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded hover:bg-gray-200 font-medium disabled:opacity-50"
             >
               Delete
             </button>
