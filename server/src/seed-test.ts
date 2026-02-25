@@ -6,6 +6,13 @@
 
 import { request, assert, BASE } from './test-helpers';
 
+let assertionCount = 0;
+const _assert = assert;
+function counted(condition: boolean, msg: string) {
+  assertionCount++;
+  _assert(condition, msg);
+}
+
 async function main() {
   console.log('=== Spelling Bee Tracker Verification ===\n');
 
@@ -15,9 +22,9 @@ async function main() {
     method: 'POST',
     body: JSON.stringify({ date: '2026-02-09', letters: ['T', 'I', 'A', 'O', 'L', 'K', 'C'] }),
   });
-  assert(day.date === '2026-02-09', 'Day created');
-  assert(day.center_letter === 'T', 'Center letter is T');
-  assert(Array.isArray(day.letters) && day.letters.length === 7, 'Letters array parsed');
+  counted(day.date === '2026-02-09', 'Day created');
+  counted(day.center_letter === 'T', 'Center letter is T');
+  counted(Array.isArray(day.letters) && day.letters.length === 7, 'Letters array parsed');
 
   // 2. Add words sequentially — verify position ordering
   console.log('\n2. Adding words sequentially...');
@@ -33,10 +40,10 @@ async function main() {
   }
 
   const words = await request('/days/2026-02-09/words');
-  assert(words.length === 5, '5 words created');
+  counted(words.length === 5, '5 words created');
   const positions = words.map((w: any) => w.position);
   for (let i = 1; i < positions.length; i++) {
-    assert(positions[i] > positions[i - 1], `Position ${i} > position ${i - 1}`);
+    counted(positions[i] > positions[i - 1], `Position ${i} > position ${i - 1}`);
   }
 
   // 3. Duplicate words allowed — same word twice, both persist
@@ -46,7 +53,7 @@ async function main() {
     body: JSON.stringify({ word: 'tick' }),
   });
   const wordsAfterDup = await request('/days/2026-02-09/words');
-  assert(wordsAfterDup.length === 6, 'Duplicate word creates second entry (6 total)');
+  counted(wordsAfterDup.length === 6, 'Duplicate word creates second entry (6 total)');
 
   // 4. Mark pangram — PATCH is_pangram
   console.log('\n4. Mark pangram...');
@@ -54,7 +61,7 @@ async function main() {
     method: 'POST',
     body: JSON.stringify({ word: 'cocktail', is_pangram: true }),
   });
-  assert(cocktail.is_pangram === true, 'Cocktail created as pangram');
+  counted(cocktail.is_pangram === true, 'Cocktail created as pangram');
   wordIds['COCKTAIL'] = cocktail.id;
 
   // 5. Accept with points — PATCH status='accepted', points=5
@@ -63,15 +70,15 @@ async function main() {
     method: 'PATCH',
     body: JSON.stringify({ status: 'accepted', points: 4 }),
   });
-  assert(accepted.status === 'accepted', 'Word accepted');
-  assert(accepted.points === 4, 'Points set to 4');
+  counted(accepted.status === 'accepted', 'Word accepted');
+  counted(accepted.points === 4, 'Points set to 4');
 
   const accepted2 = await request(`/days/2026-02-09/words/${wordIds['COCKTAIL']}`, {
     method: 'PATCH',
     body: JSON.stringify({ status: 'accepted', points: 14 }),
   });
-  assert(accepted2.status === 'accepted', 'Pangram accepted');
-  assert(accepted2.points === 14, 'Pangram points set to 14');
+  counted(accepted2.status === 'accepted', 'Pangram accepted');
+  counted(accepted2.points === 14, 'Pangram points set to 14');
 
   // 6. Reject word — PATCH status='rejected'
   console.log('\n6. Reject word...');
@@ -79,7 +86,7 @@ async function main() {
     method: 'PATCH',
     body: JSON.stringify({ status: 'rejected' }),
   });
-  assert(rejected.status === 'rejected', 'Word rejected');
+  counted(rejected.status === 'rejected', 'Word rejected');
 
   // 7. Insert at position — POST with after_word_id, verify ordering
   console.log('\n7. Insert at position...');
@@ -91,13 +98,13 @@ async function main() {
   const tickIdx = wordsAfterInsert.findIndex((w: any) => w.id === wordIds['TICK']);
   const insertedIdx = wordsAfterInsert.findIndex((w: any) => w.id === inserted.id);
   const tockIdx = wordsAfterInsert.findIndex((w: any) => w.id === wordIds['TOCK']);
-  assert(insertedIdx === tickIdx + 1, 'Inserted word is right after TICK');
-  assert(insertedIdx < tockIdx, 'Inserted word is before TOCK');
+  counted(insertedIdx === tickIdx + 1, 'Inserted word is right after TICK');
+  counted(insertedIdx < tockIdx, 'Inserted word is before TOCK');
 
   // Verify inserted_after_word_id tracking
-  assert(inserted.inserted_after_word_id === wordIds['TICK'], 'Inserted word tracks after_word_id');
+  counted(inserted.inserted_after_word_id === wordIds['TICK'], 'Inserted word tracks after_word_id');
   const tickWord = wordsAfterInsert.find((w: any) => w.id === wordIds['TICK']);
-  assert(tickWord.inserted_after_word_id === null, 'Appended word has null inserted_after_word_id');
+  counted(tickWord.inserted_after_word_id === null, 'Appended word has null inserted_after_word_id');
 
   // 8. Delete word — DELETE, verify gone
   console.log('\n8. Delete word...');
@@ -105,8 +112,8 @@ async function main() {
   const countBefore = wordsBefore.length;
   await request(`/days/2026-02-09/words/${inserted.id}`, { method: 'DELETE' });
   const wordsAfterDelete = await request('/days/2026-02-09/words');
-  assert(wordsAfterDelete.length === countBefore - 1, 'Word count decreased by 1');
-  assert(!wordsAfterDelete.find((w: any) => w.id === inserted.id), 'Deleted word is gone');
+  counted(wordsAfterDelete.length === countBefore - 1, 'Word count decreased by 1');
+  counted(!wordsAfterDelete.find((w: any) => w.id === inserted.id), 'Deleted word is gone');
 
   // Verify ON DELETE SET NULL for inserted_after_word_id
   console.log('\n8b. Delete reference word sets inserted_after_word_id to null...');
@@ -118,14 +125,14 @@ async function main() {
     method: 'POST',
     body: JSON.stringify({ word: 'cola', after_word_id: anchorWord.id }),
   });
-  assert(dependentWord.inserted_after_word_id === anchorWord.id, 'Dependent word references anchor');
+  counted(dependentWord.inserted_after_word_id === anchorWord.id, 'Dependent word references anchor');
   // Delete the anchor word
   await request(`/days/2026-02-09/words/${anchorWord.id}`, { method: 'DELETE' });
   // Re-fetch the dependent word and check that its reference is nulled
   const wordsAfterAnchorDelete = await request('/days/2026-02-09/words');
   const dependentAfter = wordsAfterAnchorDelete.find((w: any) => w.id === dependentWord.id);
-  assert(dependentAfter !== undefined, 'Dependent word still exists after anchor deletion');
-  assert(dependentAfter.inserted_after_word_id === null, 'inserted_after_word_id set to null after anchor deletion');
+  counted(dependentAfter !== undefined, 'Dependent word still exists after anchor deletion');
+  counted(dependentAfter.inserted_after_word_id === null, 'inserted_after_word_id set to null after anchor deletion');
   // Clean up: delete the dependent word
   await request(`/days/2026-02-09/words/${dependentWord.id}`, { method: 'DELETE' });
 
@@ -142,16 +149,16 @@ async function main() {
   });
   await request('/days/2026-01-01', { method: 'DELETE' });
   const res = await fetch(`${BASE}/days/2026-01-01`);
-  assert(res.status === 404, 'Deleted day returns 404');
+  counted(res.status === 404, 'Deleted day returns 404');
 
   // 10. Total points in day list
   console.log('\n10. Total points in day list...');
   const dayList = await request('/days');
   const mainDay = dayList.find((d: any) => d.date === '2026-02-09');
-  assert(mainDay !== undefined, 'Main day in list');
-  assert(mainDay.total_points === 18, `Total points is 18 (4 + 14) (got ${mainDay.total_points})`);
-  assert(mainDay.word_count > 0, 'Word count present in list');
-  assert(mainDay.pangram_count === 1, 'Pangram count is 1');
+  counted(mainDay !== undefined, 'Main day in list');
+  counted(mainDay.total_points === 18, `Total points is 18 (4 + 14) (got ${mainDay.total_points})`);
+  counted(mainDay.word_count > 0, 'Word count present in list');
+  counted(mainDay.pangram_count === 1, 'Pangram count is 1');
 
   // 11. Letter reorder
   console.log('\n11. Letter reorder...');
@@ -161,15 +168,15 @@ async function main() {
     method: 'POST',
     body: JSON.stringify({ letters: ['T', 'C', 'K', 'L', 'O', 'A', 'I'] }),
   });
-  assert(Array.isArray(reordered.letters), 'Reordered response has letters array');
-  assert(reordered.letters[0] === 'T', 'Center letter still at index 0 after reorder');
-  assert(reordered.letters.length === 7, 'Still 7 letters after reorder');
-  assert(reordered.letters[1] === 'C', 'Second letter is C after reorder');
-  assert(reordered.letters[5] === 'A', 'Sixth letter is A after reorder');
+  counted(Array.isArray(reordered.letters), 'Reordered response has letters array');
+  counted(reordered.letters[0] === 'T', 'Center letter still at index 0 after reorder');
+  counted(reordered.letters.length === 7, 'Still 7 letters after reorder');
+  counted(reordered.letters[1] === 'C', 'Second letter is C after reorder');
+  counted(reordered.letters[5] === 'A', 'Sixth letter is A after reorder');
 
   // Verify GET returns the new order
   const dayAfterReorder = await request('/days/2026-02-09');
-  assert(
+  counted(
     JSON.stringify(dayAfterReorder.letters) === JSON.stringify(['T', 'C', 'K', 'L', 'O', 'A', 'I']),
     'GET returns new letter order after reorder'
   );
@@ -180,7 +187,7 @@ async function main() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ letters: ['I', 'T', 'A', 'O', 'L', 'K', 'C'] }),
   });
-  assert(badCenterRes.status === 400, 'Reorder with wrong center letter returns 400');
+  counted(badCenterRes.status === 400, 'Reorder with wrong center letter returns 400');
 
   // 11c. Reorder with different letters — should fail with 400
   const badLettersRes = await fetch(`${BASE}/days/2026-02-09/reorder`, {
@@ -188,7 +195,7 @@ async function main() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ letters: ['T', 'X', 'A', 'O', 'L', 'K', 'C'] }),
   });
-  assert(badLettersRes.status === 400, 'Reorder with different letters returns 400');
+  counted(badLettersRes.status === 400, 'Reorder with different letters returns 400');
 
   // 11d. Reorder with wrong number of letters — should fail with 400
   const badCountRes = await fetch(`${BASE}/days/2026-02-09/reorder`, {
@@ -196,9 +203,9 @@ async function main() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ letters: ['T', 'I', 'A'] }),
   });
-  assert(badCountRes.status === 400, 'Reorder with wrong letter count returns 400');
+  counted(badCountRes.status === 400, 'Reorder with wrong letter count returns 400');
 
-  console.log('\n=== ALL TESTS PASSED ===');
+  console.log(`\n=== ALL ${assertionCount} SEED TESTS PASSED ===`);
 }
 
 main().catch(err => {

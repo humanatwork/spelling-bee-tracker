@@ -203,6 +203,56 @@ async function main() {
   countedAssert(dupLetters.data.error.includes('unique') || dupLetters.data.error.includes('duplicate'),
     'Error message mentions uniqueness or duplicates');
 
+  // ── PATCH field validation ──
+  console.log('\n8. PATCH field validation...');
+
+  // Add a word for PATCH tests
+  const patchTestWord = await request('/days/2099-02-01/words', {
+    method: 'POST',
+    body: JSON.stringify({ word: 'toil' }),
+  });
+
+  // Invalid status value
+  const badStatus = await requestRaw(`/days/2099-02-01/words/${patchTestWord.id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status: 'invalid' }),
+  });
+  countedAssert(badStatus.status === 400, 'Invalid status value returns 400');
+
+  // Negative points
+  const negPoints = await requestRaw(`/days/2099-02-01/words/${patchTestWord.id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ points: -5 }),
+  });
+  countedAssert(negPoints.status === 400, 'Negative points returns 400');
+
+  // Float points
+  const floatPoints = await requestRaw(`/days/2099-02-01/words/${patchTestWord.id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ points: 3.5 }),
+  });
+  countedAssert(floatPoints.status === 400, 'Float points returns 400');
+
+  // String points
+  const strPoints = await requestRaw(`/days/2099-02-01/words/${patchTestWord.id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ points: 'five' }),
+  });
+  countedAssert(strPoints.status === 400, 'String points returns 400');
+
+  // Non-numeric word ID in PATCH
+  const nanPatch = await requestRaw('/days/2099-02-01/words/abc', {
+    method: 'PATCH',
+    body: JSON.stringify({ status: 'accepted' }),
+  });
+  countedAssert(nanPatch.status === 400, 'Non-numeric word ID in PATCH returns 400');
+
+  // Non-numeric word ID in DELETE
+  const nanDelete = await requestRaw('/days/2099-02-01/words/abc', {
+    method: 'DELETE',
+  });
+  countedAssert(nanDelete.status === 400, 'Non-numeric word ID in DELETE returns 400');
+
   console.log(`\n=== ALL ${assertionCount} ERROR HANDLING TESTS PASSED ===`);
 }
 
