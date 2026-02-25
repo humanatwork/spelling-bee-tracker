@@ -35,12 +35,13 @@ npm run electron:dev       # In another terminal — opens the Electron window
 2. **Add words** — type words into the input field or click the hexagonal beehive to build them letter by letter
 3. **Mark results** — click a word to accept (with points), reject, toggle pangram, or delete
 4. **Insert anywhere** — hover between words to reveal `[+]` buttons for inserting at a specific position
+5. **Duplicate mirroring** — accepting or rejecting a word automatically mirrors that status to all other instances of the same word in that day. Mirrored words are visually muted, carry no points, and can't be interacted with. Changing or reverting the primary word cascades to all mirrors.
 
 ## Keyboard Shortcuts
 
 | Key | Action |
 |-----|--------|
-| Enter | Submit word |
+| Enter | Submit word (or accept with points when points input is focused) |
 | Escape | Back to day list / cancel action |
 | ? | Toggle shortcut help |
 
@@ -63,7 +64,7 @@ Base URL: `http://localhost:3141/api`
 | `/days/:date` | DELETE | Delete a day (cascades to words) |
 | `/days/:date/words` | GET | List words for a day (ordered by position) |
 | `/days/:date/words` | POST | Add a word (optional `after_word_id` for insert-at-position) |
-| `/days/:date/words/:id` | PATCH | Update status, points, or pangram flag |
+| `/days/:date/words/:id` | PATCH | Update status, points, or pangram flag (409 on mirrored words) |
 | `/days/:date/words/:id` | DELETE | Delete a word |
 | `/days/:date/reorder` | POST | Reorder a day's letters (persists custom arrangement) |
 
@@ -72,10 +73,10 @@ Base URL: `http://localhost:3141/api`
 Three SQLite tables:
 
 - **days** — date (unique), letters (JSON array of 7), center letter
-- **words** — word text, fractional position, pangram flag, status (pending/accepted/rejected), points, inserted-after reference
+- **words** — word text, fractional position, pangram flag, status (pending/accepted/rejected), points, inserted-after reference, status-from reference (for auto-mirrored duplicates)
 - **letter_reorders** — day reference, letter order (JSON array of 7), timestamp
 
-Duplicate words are allowed — the same word can appear multiple times in a day's list.
+Duplicate words are allowed — the same word can appear multiple times in a day's list. When one instance is decided, duplicates are automatically mirrored (tracked via `status_from_word_id` FK).
 
 ## Testing
 
@@ -93,7 +94,7 @@ Run a single suite:
 
 Tests run on port 3142 by default (separate from the dev server on 3141), so you can run tests while the dev server is up.
 
-Test suites cover: day/word CRUD, fractional positioning, pangram validation, accept/reject with points, cascade delete, error handling, and edge cases.
+Test suites cover: day/word CRUD, fractional positioning, pangram validation, accept/reject with points, cascade delete, auto-mirror for duplicate words, schema migration, error handling, and edge cases.
 
 ## Building
 
