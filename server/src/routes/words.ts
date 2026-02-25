@@ -158,7 +158,11 @@ router.patch('/:id', (req: Request, res: Response) => {
     return;
   }
 
-  const wordId = parseInt(param(req.params.id));
+  const wordId = parseInt(param(req.params.id), 10);
+  if (isNaN(wordId)) {
+    res.status(400).json({ error: 'Invalid word ID' });
+    return;
+  }
   const existing = db.prepare('SELECT * FROM words WHERE id = ? AND day_id = ?').get(wordId, day.id) as any;
   if (!existing) {
     res.status(404).json({ error: 'Word not found' });
@@ -185,6 +189,10 @@ router.patch('/:id', (req: Request, res: Response) => {
   const values: any[] = [];
 
   if (req.body.status !== undefined) {
+    if (!['pending', 'accepted', 'rejected'].includes(req.body.status)) {
+      res.status(400).json({ error: 'status must be one of: pending, accepted, rejected' });
+      return;
+    }
     updates.push('status = ?');
     values.push(req.body.status);
   }
@@ -193,6 +201,10 @@ router.patch('/:id', (req: Request, res: Response) => {
     values.push(req.body.is_pangram ? 1 : 0);
   }
   if (req.body.points !== undefined) {
+    if (typeof req.body.points !== 'number' || !Number.isInteger(req.body.points) || req.body.points < 0) {
+      res.status(400).json({ error: 'points must be a non-negative integer' });
+      return;
+    }
     updates.push('points = ?');
     values.push(req.body.points);
   }
@@ -232,7 +244,11 @@ router.delete('/:id', (req: Request, res: Response) => {
     return;
   }
 
-  const wordId = parseInt(param(req.params.id));
+  const wordId = parseInt(param(req.params.id), 10);
+  if (isNaN(wordId)) {
+    res.status(400).json({ error: 'Invalid word ID' });
+    return;
+  }
 
   const performDelete = db.transaction(() => {
     revertMirroredWords(wordId);
